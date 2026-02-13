@@ -1,0 +1,2182 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ҲИСОБУКИТОБ 😊 — Калькулятор Расходов</title>
+    <!-- Google Fonts: Inter & Montserrat -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            /* Shared Palette */
+            --primary: #10b981;
+            --primary-hover: #059669;
+            --primary-light: rgba(16, 185, 129, 0.1);
+            --secondary: #6366f1;
+            --accent: #f59e0b;
+            --danger: #ef4444;
+            --success: #10b981;
+            --text-on-primary: #ffffff;
+
+            /* Dark Theme (Default) */
+            --bg-body: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --bg-input: rgba(15, 23, 42, 0.6);
+            --bg-item: rgba(15, 23, 42, 0.4);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
+            --border-focus: rgba(16, 185, 129, 0.4);
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-blur: blur(12px);
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --card-glow: rgba(16, 185, 129, 0.15);
+            --management-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --btn-secondary-bg: rgba(255, 255, 255, 0.05);
+            --btn-secondary-text: #ffffff;
+        }
+
+        :root[data-theme="light"] {
+            --bg-body: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-input: #ffffff;
+            --bg-item: #f1f5f9;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: rgba(0, 0, 0, 0.08);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+            --shadow-xl: 0 20px 30px -5px rgba(0, 0, 0, 0.08);
+            --card-glow: rgba(16, 185, 129, 0.3);
+            --management-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+            --btn-secondary-bg: #f1f5f9;
+            --btn-secondary-text: #0f172a;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body,
+        .card,
+        input,
+        select,
+        .btn,
+        i,
+        .item-card,
+        .dish-item,
+        .empty-state,
+        .topbar,
+        .modal-content {
+            transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 5px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: var(--text-muted);
+        }
+
+        /* Selection */
+        ::selection {
+            background: var(--primary-light);
+            color: var(--primary);
+            text-shadow: none;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-body);
+            background-image: radial-gradient(circle at top left, var(--bg-card), var(--bg-body));
+            color: var(--text-main);
+            margin: 0;
+            min-height: 100vh;
+            padding: 8px;
+            overflow-x: hidden;
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        /* --- Header & Topbar --- */
+        .header-section {
+            text-align: center;
+            padding: 5px 0;
+        }
+
+        .header-section h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 2px;
+        }
+
+        .header-text {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
+        .header-section p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .topbar {
+            position: sticky;
+            top: 10px;
+            z-index: 100;
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 8px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .total-pill {
+            background: var(--primary-light);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 6px 16px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .topbar-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* --- Buttons --- */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--text-on-primary);
+            box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.39);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+        }
+
+        .btn-secondary {
+            background: var(--btn-secondary-bg);
+            color: var(--btn-secondary-text);
+            border: 1px solid var(--glass-border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--btn-secondary-bg);
+            opacity: 0.8;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* --- Layout Grid --- */
+        .main-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .list-column {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .header-section {
+                padding: 20px 0 10px;
+            }
+
+            .header-section h1 {
+                font-size: 1.8rem;
+            }
+
+            .header-section p {
+                font-size: 0.9rem;
+            }
+
+            .topbar {
+                flex-direction: column;
+                gap: 12px;
+                padding: 12px;
+                border-radius: 16px;
+                position: relative;
+                top: 0;
+            }
+
+            .total-pill {
+                width: 100%;
+                justify-content: center;
+                font-size: 1rem;
+            }
+
+            .topbar-actions {
+                width: 100%;
+                gap: 8px;
+            }
+
+            .topbar-actions .btn {
+                flex: 1;
+                padding: 8px;
+                font-size: 0.85rem;
+            }
+
+            .card {
+                padding: 16px;
+                border-radius: 16px;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card.management {
+            margin-bottom: 50px;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            box-shadow: var(--management-shadow), 0 0 20px var(--card-glow);
+            background: linear-gradient(to bottom, var(--bg-card), var(--bg-input));
+        }
+
+        .card h2 {
+            font-size: 1.05rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-main);
+        }
+
+        .card h2 i {
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+
+        /* --- Forms & Inputs --- */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+        }
+
+        .field-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        @media (max-width: 480px) {
+            .field-row {
+                flex-direction: column;
+            }
+        }
+
+        .field label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-bottom: 4px;
+            display: block;
+            opacity: 0.8;
+        }
+
+        .input-with-btn {
+            display: flex;
+            gap: 4px;
+            align-items: stretch;
+        }
+
+        input,
+        select {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0 12px;
+            height: 40px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.95rem;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        input[type="number"] {
+            text-align: center;
+            padding: 0;
+        }
+
+        .btn-icon-only {
+            padding: 0;
+            width: 38px;
+            height: 38px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: var(--bg-card);
+            box-shadow: 0 0 0 4px var(--primary-light);
+        }
+
+        /* --- Lists & Items --- */
+        .list-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 12px;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .list-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .item-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            animation: slideIn 0.3s ease-out;
+            position: relative;
+        }
+
+        .item-card:hover {
+            opacity: 0.95;
+            border-color: var(--primary);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .item-name {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-main);
+        }
+
+        .dish-list-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 8px;
+            align-items: start;
+        }
+
+        @media (max-width: 600px) {
+            .dish-list-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .dish-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .dish-item {
+            background: var(--bg-item);
+            color: var(--text-main);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid transparent;
+        }
+
+        .dish-item:hover {
+            border-color: var(--glass-border);
+        }
+
+        .dish-controls {
+            display: flex;
+            gap: 6px;
+            opacity: 0;
+        }
+
+        .dish-item:hover .dish-controls {
+            opacity: 1;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        .icon-btn:hover {
+            background: var(--btn-secondary-bg);
+            color: var(--btn-secondary-text);
+        }
+
+        .icon-btn.delete:hover {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* --- Summary Badge --- */
+        .summary-badge {
+            margin-top: 4px;
+            background: var(--primary-light);
+            border: 1px solid var(--primary-light);
+            padding: 10px;
+            border-radius: 10px;
+            color: var(--text-main);
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .summary-total {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--primary);
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        /* --- Payer Section --- */
+        .payer-card {
+            border: 2px solid var(--primary) !important;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+        }
+
+        .reimbursement-badge {
+            font-size: 0.85rem;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--primary);
+            padding: 4px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            font-weight: 700;
+        }
+
+        body.screenshot-mode .reimbursement-badge {
+            display: none !important;
+        }
+
+        .payer-info-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px;
+            margin-top: 10px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .debt-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+        }
+
+        .debt-table th {
+            text-align: left;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            padding: 0 12px;
+        }
+
+        .debt-table td {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 12px;
+        }
+
+        .debt-table td:first-child {
+            border-radius: 10px 0 0 10px;
+            font-weight: 600;
+        }
+
+        .debt-table td:last-child {
+            border-radius: 0 10px 10px 0;
+            text-align: right;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* --- Modals --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            width: 100%;
+            max-width: 500px;
+            padding: 32px;
+            position: relative;
+            box-shadow: var(--shadow-xl);
+            animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.5rem;
+        }
+
+        /* --- Toasts --- */
+        .toast-container {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toast {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border-left: 4px solid var(--primary);
+            border-radius: 12px;
+            padding: 16px 20px;
+            color: var(--text-main);
+            box-shadow: var(--shadow-xl);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 300px;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        .toast.error {
+            border-left-color: var(--danger);
+        }
+
+        .toast.success {
+            border-left-color: var(--success);
+        }
+
+        /* --- Animations --- */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* --- Empty States --- */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+        }
+
+        .empty-state:hover {
+            border-color: var(--primary);
+            background: rgba(16, 185, 129, 0.05);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.15);
+        }
+
+        .empty-state i {
+            font-size: 3.5rem;
+            margin-bottom: 16px;
+            opacity: 0.3;
+            transition: all 0.3s ease;
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+        }
+
+        .empty-state:hover i {
+            color: var(--primary);
+            opacity: 1;
+            transform: scale(1.1) rotate(-5deg);
+        }
+
+        .empty-state p {
+            margin: 0;
+            font-weight: 500;
+            font-size: 1.05rem;
+        }
+
+        .empty-state .cta-text {
+            font-size: 0.85rem;
+            color: var(--primary);
+            margin-top: 8px;
+            font-weight: 600;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+        }
+
+        .empty-state:hover .cta-text {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* --- Utility --- */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-primary {
+            color: var(--primary);
+        }
+
+        .mt-auto {
+            margin-top: auto;
+        }
+
+        /* --- Screenshot Mode --- */
+        body.screenshot-mode {
+            background: var(--bg-body) !important;
+            padding: 20px !important;
+            color: var(--text-main) !important;
+        }
+
+        body.screenshot-mode .payer-info-box {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border) !important;
+            color: var(--text-main) !important;
+            margin-bottom: 24px !important;
+        }
+
+        body.screenshot-mode #payerNameDisplay,
+        body.screenshot-mode #payerWalletDisplay {
+            color: var(--text-main) !important;
+        }
+
+        body.screenshot-mode .payer-info-box div[style*="background: rgba"] {
+            background: var(--bg-item) !important;
+            border-color: var(--border) !important;
+        }
+
+        body.screenshot-mode .payer-info-box div[style*="background: rgba(15, 23, 42, 0.3)"] {
+            background: var(--bg-card) !important;
+            border-color: var(--border) !important;
+        }
+
+        body.screenshot-mode .payer-info-box #walletDisplayBox,
+        body.screenshot-mode .payer-info-box .total-bill-badge,
+        body.screenshot-mode .payer-info-box #restaurantBadge,
+        body.screenshot-mode .payer-name-badge {
+            background: var(--bg-item) !important;
+            border-color: var(--border) !important;
+            color: var(--text-main) !important;
+            height: 42px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 14px !important;
+            border-radius: 10px !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            font-weight: 700 !important;
+            box-shadow: none !important;
+        }
+
+        body.screenshot-mode .debt-pill {
+            background: var(--bg-item) !important;
+            border-color: var(--border) !important;
+            padding: 6px 12px !important;
+            border-radius: 10px !important;
+            height: 34px !important;
+        }
+
+        body.screenshot-mode .debt-pill .debt-name {
+            color: var(--text-main) !important;
+            font-weight: 600 !important;
+            font-size: 0.8rem !important;
+            opacity: 0.8 !important;
+        }
+
+        body.screenshot-mode .debt-pill .debt-amount {
+            color: #059669 !important;
+            font-size: 0.8rem !important;
+            font-weight: 700 !important;
+        }
+
+        body.screenshot-mode .debts-label {
+            display: block !important;
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+            color: var(--text-muted) !important;
+            letter-spacing: normal !important;
+            margin-bottom: 4px !important;
+            text-transform: none !important;
+        }
+
+        body.screenshot-mode .total-bill-badge {
+            flex-direction: row !important;
+            gap: 10px !important;
+        }
+
+        body.screenshot-mode .payer-info-header {
+            margin-bottom: 0 !important;
+        }
+
+        body.screenshot-mode .payer-info-box #restaurantBadge i,
+        body.screenshot-mode .payer-info-box #walletDisplayBox i {
+            color: var(--text-muted) !important;
+        }
+
+        body.screenshot-mode .total-bill-badge .value {
+            color: var(--text-main) !important;
+        }
+
+        #screenshotCommission {
+            font-size: 0.8em;
+            opacity: 0.6;
+            margin-left: 4px;
+            font-weight: 500;
+        }
+
+        body.screenshot-mode .container {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 40px !important;
+        }
+
+        body.screenshot-mode .topbar,
+        body.screenshot-mode .card.management,
+        body.screenshot-mode .icon-btn,
+        body.screenshot-mode .btn:not(.exit-btn),
+        body.screenshot-mode .dish-controls,
+        body.screenshot-mode .empty-state,
+        body.screenshot-mode .header-section p,
+        body.screenshot-mode .reimbursement-badge {
+            display: none !important;
+        }
+
+        body.screenshot-mode .header-section h1 {
+            color: var(--text-main) !important;
+            -webkit-text-fill-color: var(--text-main) !important;
+            margin-bottom: 15px !important;
+        }
+
+        .restaurant-display {
+            display: none;
+        }
+
+        body.screenshot-mode .header-text {
+            background: none !important;
+            -webkit-text-fill-color: var(--text-main) !important;
+            color: var(--text-main) !important;
+        }
+
+        .screenshot-total-badge {
+            display: none;
+        }
+
+        .only-screenshot {
+            display: none;
+        }
+
+        /* Адаптивный блок общего счета */
+        .total-bill-badge {
+            text-align: right;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 8px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .total-bill-badge .label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .total-bill-badge .value {
+            font-weight: 800;
+            color: var(--text-main);
+            font-size: 1.25rem;
+            white-space: nowrap;
+        }
+
+        @media (min-width: 600px) {
+            .total-bill-badge {
+                flex-direction: row;
+                align-items: baseline;
+                gap: 10px;
+                padding: 10px 18px;
+            }
+
+            .total-bill-badge .label {
+                margin-bottom: 0;
+            }
+        }
+
+        /* Группа информации справа (заведение + итог) */
+        .right-info-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
+
+        @media (min-width: 1024px) {
+            .right-info-group {
+                flex-direction: row;
+                align-items: center;
+                gap: 15px;
+            }
+
+            .payer-info-header {
+                align-items: center !important;
+            }
+        }
+
+        body.screenshot-mode .only-screenshot {
+            display: flex;
+        }
+
+        body.screenshot-mode .main-grid {
+            display: block !important;
+        }
+
+        body.screenshot-mode .list-column {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 20px !important;
+        }
+
+        /* Динамическая сетка для списков */
+        .card .list-container {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+            gap: 10px !important;
+            align-items: start !important;
+        }
+
+        #participantsList {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+            gap: 12px !important;
+            align-items: start !important;
+        }
+
+        body.screenshot-mode #participantsList {
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)) !important;
+            gap: 10px !important;
+        }
+
+        body.screenshot-mode .card {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border) !important;
+            box-shadow: none !important;
+            color: var(--text-main) !important;
+            width: 100% !important;
+            margin-bottom: 0 !important;
+            padding: 8px !important;
+        }
+
+        body.screenshot-mode .card h2 {
+            color: var(--text-main) !important;
+            text-transform: none !important;
+            letter-spacing: normal !important;
+            font-size: 1.1rem !important;
+            border-bottom: none !important;
+            padding-bottom: 0 !important;
+            margin-bottom: 10px !important;
+            font-weight: 600 !important;
+            opacity: 0.9;
+        }
+
+        body.screenshot-mode .card h2 i {
+            font-size: 1rem;
+            margin-right: 12px;
+        }
+
+        body.screenshot-mode .card h2 i.fa-utensils {
+            color: #d97706 !important;
+            /* Приглушенный янтарный */
+        }
+
+        body.screenshot-mode .card h2 i.fa-user-friends {
+            color: #2563eb !important;
+            /* Более глубокий синий */
+        }
+
+        body.screenshot-mode .item-card {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border) !important;
+            color: var(--text-main) !important;
+            padding: 8px !important;
+            gap: 4px !important;
+        }
+
+        body.screenshot-mode .item-name {
+            color: var(--text-main) !important;
+            font-weight: 700 !important;
+        }
+
+        body.screenshot-mode .dish-item {
+            background: var(--bg-item) !important;
+            color: var(--text-main) !important;
+            padding: 4px 8px !important;
+            opacity: 0.9;
+        }
+
+        body.screenshot-mode .summary-badge {
+            background: var(--primary-light) !important;
+            border: 1px solid var(--primary-light) !important;
+            color: var(--text-main) !important;
+            padding: 6px !important;
+            margin-top: 5px !important;
+        }
+
+        body.screenshot-mode .summary-total {
+            border-top-color: #dcfce7;
+        }
+
+        body.screenshot-mode .payer-card {
+            border-width: 2px !important;
+        }
+
+        .screenshot-exit {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: none;
+            z-index: 10000;
+            animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            gap: 12px;
+        }
+
+        .exit-btn {
+            background: #10b981 !important;
+            color: white !important;
+            border-radius: 999px !important;
+            padding: 0 24px !important;
+            height: 48px !important;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4) !important;
+            border: none !important;
+            font-size: 0.95rem !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+
+        .theme-btn-ss {
+            width: 48px !important;
+            padding: 0 !important;
+            background: var(--bg-card) !important;
+            color: var(--text-main) !important;
+            border: 1px solid var(--border) !important;
+        }
+
+        .exit-btn:hover {
+            transform: scale(1.05) translateY(-2px) !important;
+            box-shadow: 0 15px 30px rgba(16, 185, 129, 0.5) !important;
+        }
+
+        @keyframes bounceIn {
+            0% {
+                transform: scale(0.3);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+
+            70% {
+                transform: scale(0.9);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        body.screenshot-mode .header-section h1 {
+            font-size: 1.5rem !important;
+            margin-bottom: 0 !important;
+        }
+
+        body.screenshot-mode .header-section p {
+            display: none !important;
+        }
+
+        body.screenshot-mode .screenshot-exit {
+            display: flex !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="container">
+        <header class="header-section">
+            <h1><span class="header-text">ҲИСОБУКИТОБ</span> 😊</h1>
+            <p>Умный расчет счета для идеальных компаний</p>
+        </header>
+
+        <nav class="topbar">
+            <div class="total-pill">
+                <i class="fas fa-receipt"></i>
+                <span id="totalCostDisplay">Общая Стоимость: 0.00 SM</span>
+            </div>
+            <div id="dateDisplay"
+                style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-left: auto; margin-right: 15px; display: none;">
+            </div>
+            <div class="topbar-actions">
+                <button class="btn btn-secondary" style="width: 42px; padding: 0;" onclick="toggleTheme()"
+                    id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="btn btn-secondary" style="width: 42px; padding: 0;" onclick="openHistory()"
+                    title="История">
+                    <i class="fas fa-history"></i>
+                </button>
+                <button class="btn btn-secondary" onclick="toggleScreenshotMode()">
+                    <i class="fas fa-camera"></i> Скриншот
+                </button>
+                <button class="btn btn-danger" onclick="confirmClearAll()">
+                    <i class="fas fa-trash-alt"></i> Сбросить
+                </button>
+            </div>
+        </nav>
+
+        <main class="main-grid">
+            <!-- Left Column: Management -->
+            <section class="card management" style="padding: 10px 15px;">
+                <h2><i class="fas fa-sliders-h"></i> Управление</h2>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: end;">
+                    <div style="display: flex; gap: 8px; margin-bottom: 0;">
+                        <button class="btn btn-primary" style="flex: 1; height: 38px;"
+                            onclick="openModal('participantModal')">
+                            <i class="fas fa-plus"></i> Блюдо
+                        </button>
+                        <button class="btn btn-secondary" style="flex: 1; height: 38px;"
+                            onclick="openModal('sharedModal')">
+                            <i class="fas fa-users"></i> Общее
+                        </button>
+                    </div>
+
+                    <div class="field" style="width: 140px;">
+                        <label>Дата</label>
+                        <input type="date" id="checkDate" onchange="updateDate()" style="font-family: inherit;">
+                    </div>
+
+                    <div class="field" style="flex: 1; min-width: 180px;">
+                        <label>Место</label>
+                        <input type="text" id="restaurantName" placeholder="Где сидели?"
+                            oninput="updateRestaurantName()">
+                    </div>
+                    <div class="field" style="flex: 1; min-width: 160px;">
+                        <label>Плательщик</label>
+                        <select id="payerSelect" onchange="updatePayer()">
+                            <option value="">Выберите...</option>
+                        </select>
+                    </div>
+
+                    <div class="field" style="flex: 1; min-width: 180px;">
+                        <label>Реквизиты</label>
+                        <div class="input-with-btn">
+                            <input type="text" id="payerWallet" placeholder="Карта...">
+                            <button class="btn btn-secondary btn-icon-only" onclick="copyWallet()" title="Копировать">
+                                <i class="fas fa-copy" style="font-size: 0.9rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="field" style="flex: 1; min-width: 130px; max-width: 150px;">
+                        <label>Сервис (%)</label>
+                        <div class="input-with-btn">
+                            <input type="number" id="commission" placeholder="0" min="0">
+                            <button class="btn btn-secondary btn-icon-only" onclick="setCommission()" title="Применить">
+                                <i class="fas fa-check" style="font-size: 0.9rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+    </div>
+    </section>
+
+    <!-- Right Column: Lists -->
+    <section class="list-column">
+        <!-- Payer Summary Info (moved here for visibility in screenshot) -->
+        <div id="payerInfoBox" class="card payer-info-box hidden" style="margin-bottom: 0;">
+            <div class="payer-info-header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div class="payer-name-badge" style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-user-check text-primary" style="font-size: 1rem;"></i>
+                        <span style="font-weight: 800; font-size: 1.1rem; color: var(--text-main);"
+                            id="payerNameDisplay">—</span>
+                    </div>
+
+                    <div id="walletDisplayBox"
+                        style="font-size: 0.85rem; color: var(--text-muted); background: var(--bg-item); padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border); font-family: monospace; display: flex; align-items: center;">
+                        <i class="fas fa-wallet" style="font-size: 0.75rem; margin-right: 6px; opacity: 0.7;"></i>
+                        <span id="payerWalletDisplay">не указан</span>
+                    </div>
+
+                    <div id="payerReimbursementBadge" class="reimbursement-badge"
+                        style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 4px 10px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.2);">
+                        К возврату: <span id="payerReimbursement">0.00</span>
+                    </div>
+                </div>
+
+                <!-- Right Side: Restaurant and Total Bill grouped -->
+                <div class="only-screenshot right-info-group" style="display: flex; align-items: center; gap: 10px;">
+                    <div id="screenshotDateBadge"
+                        style="font-size: 0.85rem; color: var(--text-main); font-weight: 500; display: flex; align-items: center; white-space: nowrap;">
+                    </div>
+
+                    <div id="restaurantBadge"
+                        style="font-size: 0.95rem; color: var(--text-muted); background: var(--bg-item); padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); display: none; white-space: nowrap; align-items: center; justify-content: center; gap: 8px; height: 42px; box-sizing: border-box; line-height: 1;">
+                        <span id="restaurantNameDisplay" style="font-weight: 600; color: inherit;">—</span>
+                    </div>
+
+                    <div class="total-bill-badge" style="margin-top: 0; padding: 10px 16px;">
+                        <div class="label">
+                            Общий счет<span id="screenshotCommission"></span>
+                        </div>
+                        <div class="value" id="screenshotTotalAmount">0.00 SM</div>
+                    </div>
+                </div>
+            </div>
+            <div id="debtsContainer" style="margin-top: 2px;"></div>
+        </div>
+
+        <div class="card">
+            <h2><i class="fas fa-utensils"></i> Общие блюда</h2>
+            <div class="list-container" id="sharedList">
+                <div class="empty-state">
+                    <i class="fas fa-users"></i>
+                    <p>Общих блюд пока нет</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2><i class="fas fa-user-friends"></i> Участники</h2>
+            <div class="list-container" id="participantsList">
+                <div class="empty-state">
+                    <i class="fas fa-user-plus"></i>
+                    <p>Добавьте первого участника</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="participantModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('participantModal')">&times;</button>
+            <h2>Новое блюдо</h2>
+            <div class="input-group">
+                <div class="field">
+                    <label>Имя участника</label>
+                    <input list="participantsDatalist" id="participantName" placeholder="Введите имя">
+                    <datalist id="participantsDatalist"></datalist>
+                </div>
+                <div class="field">
+                    <label>Название блюда</label>
+                    <input list="dishNamesDatalist" id="dishName" placeholder="Название">
+                    <datalist id="dishNamesDatalist"></datalist>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label>Цена (SM)</label>
+                        <input type="number" id="dishCost" placeholder="0.00">
+                    </div>
+                    <div class="field">
+                        <label>Кол-во</label>
+                        <input type="number" id="dishQuantity" value="1" min="1">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="addDish()">
+                    <i class="fas fa-plus-circle"></i> Добавить в чек
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sharedModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('sharedModal')">&times;</button>
+            <h2>Общее блюдо</h2>
+            <div class="input-group">
+                <div class="field">
+                    <label>Название блюда</label>
+                    <input id="sharedDishName" placeholder="Например, Пицца на всех">
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label>Цена (SM)</label>
+                        <input type="number" id="sharedDishCost" placeholder="0.00">
+                    </div>
+                    <div class="field">
+                        <label>Кол-во</label>
+                        <input type="number" id="sharedDishQuantity" value="1" min="1">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="addSharedDish()">
+                    <i class="fas fa-plus-circle"></i> Добавить общее блюдо
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('historyModal')">&times;</button>
+            <h2>📜 История чеков</h2>
+            <div id="historyList" class="list-container" style="max-height: 400px; overflow-y: auto; margin-top: 15px;">
+                <!-- History items will be here -->
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+            <h2 id="editModalTitle">Редактировать</h2>
+            <div class="input-group">
+                <input type="hidden" id="editType">
+                <input type="hidden" id="editId">
+                <input type="hidden" id="editParticipant">
+
+                <div class="field">
+                    <label>Название</label>
+                    <input id="editName">
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label>Цена</label>
+                        <input type="number" id="editCost">
+                    </div>
+                    <div class="field">
+                        <label>Кол-во</label>
+                        <input type="number" id="editQuantity" min="1">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="saveEdit()">
+                    <i class="fas fa-save"></i> Сохранить изменения
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="screenshot-exit">
+        <button class="btn exit-btn theme-btn-ss" onclick="toggleTheme()" id="themeToggleSS">
+            <i class="fas fa-moon"></i>
+        </button>
+        <button class="btn btn-primary exit-btn" onclick="downloadImage()"
+            style="background: var(--secondary); border: 1px solid var(--secondary);">
+            <i class="fas fa-download"></i> Скачать
+        </button>
+        <button class="btn btn-primary exit-btn" onclick="toggleScreenshotMode()">
+            <i class="fas fa-undo"></i> Выход
+        </button>
+    </div>
+
+    <script>
+        // --- Core Data ---
+        let participants = {};
+        let sharedDishes = [];
+        let dishPrices = {};
+        let commission = 0;
+        let payer = null;
+        let payerWallet = '';
+
+        let totalsByParticipant = {};
+        let totalBill = 0;
+        let restaurantName = '';
+        let checkDate = ''; // YYYY-MM-DD
+
+        // Theme Initialization
+        const savedTheme = localStorage.getItem('foodCalc_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const target = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', target);
+            localStorage.setItem('foodCalc_theme', target);
+            updateThemeIcon(target);
+        }
+
+        function updateThemeIcon(theme) {
+            const btns = [document.getElementById('themeToggle'), document.getElementById('themeToggleSS')];
+            // Show icon of the mode we can switch TO (opposite of current)
+            const icon = theme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+            btns.forEach(btn => {
+                if (btn) btn.innerHTML = icon;
+            });
+        }
+
+        // Initialize icon on startup
+        window.addEventListener('DOMContentLoaded', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            updateThemeIcon(currentTheme);
+
+            // Set Date
+            const dateEl = document.getElementById('dateDisplay');
+            if (dateEl) {
+                const options = { day: 'numeric', month: 'long', year: 'numeric' };
+                dateEl.innerText = new Date().toLocaleDateString('ru-RU', options);
+                dateEl.style.display = 'block';
+            }
+        });
+
+        // --- Initialization ---
+        window.onload = function () {
+            loadFromStorage();
+            updateUI();
+        };
+
+        function loadFromStorage() {
+            participants = JSON.parse(localStorage.getItem('gs_participants') || '{}');
+            sharedDishes = JSON.parse(localStorage.getItem('gs_sharedDishes') || '[]');
+            dishPrices = JSON.parse(localStorage.getItem('gs_dishPrices') || '{}');
+            commission = parseFloat(localStorage.getItem('gs_commission') || '0');
+            payer = localStorage.getItem('gs_payer') || null;
+            payerWallet = localStorage.getItem('gs_payerWallet') || '';
+            restaurantName = localStorage.getItem('gs_restaurantName') || '';
+            checkDate = localStorage.getItem('gs_checkDate') || new Date().toISOString().split('T')[0];
+
+            // Set initial input values
+            document.getElementById('commission').value = commission || '';
+            document.getElementById('payerWallet').value = payerWallet || '';
+            document.getElementById('restaurantName').value = restaurantName;
+            document.getElementById('checkDate').value = checkDate;
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('gs_participants', JSON.stringify(participants));
+            localStorage.setItem('gs_sharedDishes', JSON.stringify(sharedDishes));
+            localStorage.setItem('gs_dishPrices', JSON.stringify(dishPrices));
+            localStorage.setItem('gs_commission', commission);
+            localStorage.setItem('gs_payer', payer || '');
+            localStorage.setItem('gs_payerWallet', payerWallet);
+            localStorage.setItem('gs_restaurantName', restaurantName);
+            localStorage.setItem('gs_checkDate', checkDate);
+        }
+
+        // --- History Logic ---
+        function getHistory() {
+            return JSON.parse(localStorage.getItem('gs_history') || '[]');
+        }
+
+        function saveHistoryItem() {
+            if (Object.keys(participants).length === 0 && sharedDishes.length === 0) {
+                pushToast('error', 'Нет данных для сохранения');
+                return;
+            }
+
+            const history = getHistory();
+
+            // Format friendly date from checkDate
+            const [y, m, d] = checkDate.split('-');
+            const dateObj = new Date(y, m - 1, d);
+            const dateStr = dateObj.toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            const title = restaurantName || 'Без названия';
+
+            const item = {
+                id: Date.now(),
+                date: dateStr,
+                rawDate: checkDate,
+                title: title,
+                total: totalBill,
+                data: {
+                    participants, sharedDishes, dishPrices, commission, payer, payerWallet, restaurantName, checkDate
+                }
+            };
+
+            history.unshift(item); // Add to top
+            localStorage.setItem('gs_history', JSON.stringify(history));
+            pushToast('success', 'Чек сохранен в историю');
+            renderHistoryList();
+        }
+
+        function openHistory() {
+            renderHistoryList();
+            openModal('historyModal');
+        }
+
+        function renderHistoryList() {
+            const list = document.getElementById('historyList');
+            const history = getHistory();
+
+            if (history.length === 0) {
+                list.innerHTML = '<div class="empty-state"><p>История пуста</p></div>';
+                return;
+            }
+
+            list.innerHTML = history.map(item => `
+                <div class="item-card" style="margin-bottom: 10px; cursor: pointer;" onclick="loadHistoryItem(${item.id})">
+                    <div class="item-header">
+                        <div>
+                            <span class="item-name">${item.title}</span>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">${item.date}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: bold; color: var(--primary);">${item.total.toFixed(2)} SM</div>
+                            <button class="icon-btn delete" onclick="deleteHistoryItem(event, ${item.id})"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadHistoryItem(id) {
+            if (!confirm('Загрузить этот чек? Текущие несохраненные данные будут заменены.')) return;
+
+            const history = getHistory();
+            const item = history.find(i => i.id === id);
+
+            if (item) {
+                const d = item.data;
+                participants = d.participants || {};
+                sharedDishes = d.sharedDishes || [];
+                dishPrices = d.dishPrices || {};
+                commission = d.commission || 0;
+                payer = d.payer || null;
+                payerWallet = d.payerWallet || '';
+                restaurantName = d.restaurantName || '';
+                checkDate = d.checkDate || new Date().toISOString().split('T')[0];
+
+                // Update inputs
+                document.getElementById('commission').value = commission;
+                document.getElementById('payerWallet').value = payerWallet;
+                document.getElementById('restaurantName').value = restaurantName;
+                document.getElementById('checkDate').value = checkDate;
+
+                updateUI();
+                closeModal('historyModal');
+                pushToast('success', 'Чек загружен');
+            }
+        }
+
+        function deleteHistoryItem(e, id) {
+            e.stopPropagation(); // Prevent loading
+            if (!confirm('Удалить эту запись из истории?')) return;
+
+            let history = getHistory();
+            history = history.filter(i => i.id !== id);
+            localStorage.setItem('gs_history', JSON.stringify(history));
+            renderHistoryList();
+        }
+
+        // --- Logic Functions ---
+        function addDish() {
+            const name = document.getElementById('participantName').value.trim();
+            const dish = document.getElementById('dishName').value.trim();
+            const cost = parseFloat(document.getElementById('dishCost').value);
+            const qty = parseInt(document.getElementById('dishQuantity').value) || 1;
+
+            if (!name || !dish || isNaN(cost)) {
+                pushToast('error', 'Заполните все поля правильно');
+                return;
+            }
+
+            if (!participants[name]) participants[name] = [];
+            participants[name].push({ dishName: dish, dishCost: cost, dishQuantity: qty });
+
+            dishPrices[dish] = cost;
+
+            closeModal('participantModal');
+            pushToast('success', `Добавлено: ${dish} для ${name}`);
+
+            // Clear inputs
+            document.getElementById('participantName').value = '';
+            document.getElementById('dishName').value = '';
+            document.getElementById('dishCost').value = '';
+            document.getElementById('dishQuantity').value = '1';
+
+            updateUI();
+        }
+
+        function addSharedDish() {
+            const dish = document.getElementById('sharedDishName').value.trim();
+            const cost = parseFloat(document.getElementById('sharedDishCost').value);
+            const qty = parseInt(document.getElementById('sharedDishQuantity').value) || 1;
+
+            if (!dish || isNaN(cost)) {
+                pushToast('error', 'Заполните все поля');
+                return;
+            }
+
+            sharedDishes.push({ sharedDishName: dish, sharedDishCost: cost, sharedDishQuantity: qty });
+            dishPrices[dish] = cost;
+
+            closeModal('sharedModal');
+            pushToast('success', `Добавлено общее блюдо: ${dish}`);
+
+            document.getElementById('sharedDishName').value = '';
+            document.getElementById('sharedDishCost').value = '';
+            document.getElementById('sharedDishQuantity').value = '1';
+
+            updateUI();
+        }
+
+        function calculateTotals() {
+            let subtotalPersonal = 0;
+            let subtotalShared = sharedDishes.reduce((acc, d) => acc + (d.sharedDishCost * d.sharedDishQuantity), 0);
+
+            const pNames = Object.keys(participants);
+            const participantCount = pNames.length;
+
+            // Shared per person
+            const sharedPerPerson = participantCount > 0 ? subtotalShared / participantCount : 0;
+            const sharedCommission = sharedPerPerson * (commission / 100);
+            const sharedFinal = sharedPerPerson + sharedCommission;
+
+            totalBill = 0;
+            totalsByParticipant = {};
+
+            pNames.forEach(name => {
+                const personal = participants[name].reduce((acc, d) => acc + (d.dishCost * d.dishQuantity), 0);
+                const personalCommission = personal * (commission / 100);
+                const final = personal + personalCommission + sharedFinal;
+
+                totalsByParticipant[name] = final;
+                totalBill += final;
+            });
+
+            // If no participants but there are shared dishes, show shared in total
+            if (participantCount === 0) {
+                totalBill = subtotalShared + (subtotalShared * (commission / 100));
+            }
+        }
+
+        function updateUI() {
+            calculateTotals();
+            saveToStorage();
+
+            document.getElementById('totalCostDisplay').innerText = `Общая Стоимость: ${totalBill.toFixed(2)} SM`;
+            document.getElementById('screenshotTotalAmount').innerText = `${totalBill.toFixed(2)} SM`;
+
+            const commSpan = document.getElementById('screenshotCommission');
+            if (commSpan) {
+                commSpan.innerText = commission > 0 ? ` (+${commission}%)` : '';
+            }
+
+            renderSharedList();
+            renderParticipantsList();
+            updateDatalists();
+            updatePayerSelect();
+            updatePayerUI();
+
+            const restDisplay = document.getElementById('restaurantNameDisplay');
+            if (restaurantName) {
+                restDisplay.innerText = `📍 ${restaurantName}`;
+            } else {
+                restDisplay.innerText = '';
+            }
+
+            // Update Screenshot Date & Header Date
+            const [y, m, d] = checkDate.split('-');
+            const dateObj = new Date(y, m - 1, d);
+            const friendlyDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            const screenshotBadge = document.getElementById('screenshotDateBadge');
+            if (screenshotBadge) screenshotBadge.innerText = friendlyDate;
+
+            const headerBadge = document.getElementById('dateDisplay');
+            if (headerBadge) {
+                headerBadge.innerText = friendlyDate;
+                headerBadge.style.display = 'block';
+            }
+        }
+
+        function updateDate() {
+            checkDate = document.getElementById('checkDate').value;
+            updateUI();
+        }
+
+        function updateRestaurantName() {
+            restaurantName = document.getElementById('restaurantName').value;
+            saveToStorage();
+
+            const restDisplay = document.getElementById('restaurantNameDisplay');
+            if (restaurantName) {
+                restDisplay.innerText = `📍 ${restaurantName}`;
+            } else {
+                restDisplay.innerText = '';
+            }
+        }
+
+        function renderSharedList() {
+            const container = document.getElementById('sharedList');
+            if (sharedDishes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" onclick="openModal('sharedModal')">
+                        <i class="fas fa-pizza-slice"></i>
+                        <p>Общих блюд пока нет</p>
+                        <span class="cta-text">Нажмите, чтобы добавить угощения</span>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = sharedDishes.map((d, i) => `
+                <div class="dish-item">
+                    <span><strong>${d.sharedDishQuantity}х</strong> ${d.sharedDishName} — ${(d.sharedDishCost * d.sharedDishQuantity).toFixed(2)} SM</span>
+                    <div class="dish-controls">
+                        <button class="icon-btn" onclick="openEdit('shared', ${i})"><i class="fas fa-edit"></i></button>
+                        <button class="icon-btn delete" onclick="deleteItem('shared', ${i})"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderParticipantsList() {
+            const container = document.getElementById('participantsList');
+            const pNames = Object.keys(participants);
+
+            if (pNames.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" onclick="openModal('participantModal')">
+                        <i class="fas fa-user-plus"></i>
+                        <p>Список участников пуст</p>
+                        <span class="cta-text">Нажмите, чтобы добавить первого</span>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = pNames.map(name => {
+                const dishes = participants[name];
+                const personalSubtotal = dishes.reduce((acc, d) => acc + (d.dishCost * d.dishQuantity), 0);
+                const isPayer = (name === payer);
+
+                return `
+                    <div class="item-card ${isPayer ? 'payer-card' : ''}">
+                        <div class="item-header">
+                            <span class="item-name">${name}</span>
+                            <button class="icon-btn delete" onclick="deleteParticipant('${name}')"><i class="fas fa-user-minus"></i></button>
+                        </div>
+                        <div class="dish-list">
+                            ${dishes.map((d, idx) => `
+                                <div class="dish-item">
+                                    <span>${d.sharedDishQuantity || d.dishQuantity}х ${d.dishName} — ${(d.dishCost * d.dishQuantity).toFixed(2)} SM</span>
+                                    <div class="dish-controls">
+                                        <button class="icon-btn" onclick="openEdit('personal', ${idx}, '${name}')"><i class="fas fa-edit"></i></button>
+                                        <button class="icon-btn delete" onclick="deleteItem('personal', ${idx}, '${name}')"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="summary-badge">
+                            <div class="summary-row"><span>Промежуточный итог:</span><span>${personalSubtotal.toFixed(2)} SM</span></div>
+                            <div class="summary-row"><span>Доля общих + комиссия:</span><span>${(totalsByParticipant[name] - personalSubtotal * (1 + commission / 100)).toFixed(2)} SM</span></div>
+                            <div class="summary-total"><span>Итого к оплате:</span><span>${totalsByParticipant[name].toFixed(2)} SM</span></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateDatalists() {
+            const pList = document.getElementById('participantsDatalist');
+            const dList = document.getElementById('dishNamesDatalist');
+
+            pList.innerHTML = Object.keys(participants).map(n => `<option value="${n}">`).join('');
+            dList.innerHTML = Object.keys(dishPrices).map(d => `<option value="${d}">`).join('');
+        }
+
+        // Автозаполнение цены при изменении названия блюда
+        document.getElementById('dishName').addEventListener('input', function (e) {
+            const val = e.target.value;
+            if (dishPrices[val]) {
+                document.getElementById('dishCost').value = dishPrices[val];
+            }
+        });
+
+        // --- Payer Logic ---
+        function updatePayerSelect() {
+            const select = document.getElementById('payerSelect');
+            const current = select.value || payer;
+            select.innerHTML = '<option value="">Кто платил?</option>';
+            Object.keys(participants).forEach(n => {
+                const opt = document.createElement('option');
+                opt.value = n;
+                opt.innerText = n;
+                select.appendChild(opt);
+            });
+            function updateRestaurantName() {
+                restaurantName = document.getElementById('restaurantName').value;
+                saveToStorage();
+
+                const badge = document.getElementById('restaurantBadge');
+                const display = document.getElementById('restaurantNameDisplay');
+
+                if (restaurantName) {
+                    badge.style.display = 'flex';
+                    display.innerText = restaurantName;
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+
+            select.value = current || "";
+            updateRestaurantName();
+        }
+
+        function updatePayer() {
+            payer = document.getElementById('payerSelect').value || null;
+            updateUI();
+        }
+
+        document.getElementById('payerWallet').addEventListener('input', (e) => {
+            payerWallet = e.target.value;
+            saveToStorage();
+            updatePayerUI();
+        });
+
+        function updatePayerUI() {
+            const box = document.getElementById('payerInfoBox');
+            if (!payer) {
+                box.classList.add('hidden');
+                return;
+            }
+
+            box.classList.remove('hidden');
+            document.getElementById('payerNameDisplay').innerText = payer;
+
+            // Show/Hide wallet
+            const walletBox = document.getElementById('walletDisplayBox');
+            if (payerWallet) {
+                walletBox.style.display = 'block';
+                document.getElementById('payerWalletDisplay').innerText = payerWallet;
+            } else {
+                walletBox.style.display = 'none';
+            }
+
+            const payerDue = totalsByParticipant[payer] || 0;
+            const reimbursement = totalBill - payerDue;
+            const reimEl = document.getElementById('payerReimbursement');
+            if (reimEl) reimEl.innerText = `${reimbursement.toFixed(2)} SM`;
+
+            // Debts Grid (Ultra-Compact)
+            const debtsContainer = document.getElementById('debtsContainer');
+            if (!debtsContainer) return;
+
+            const pNames = Object.keys(participants).filter(n => n !== payer);
+
+            if (pNames.length === 0) {
+                debtsContainer.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted); opacity: 0.6;">Других участников пока нет</p>`;
+            } else {
+                debtsContainer.innerHTML = `
+                    <div class="only-screenshot debts-label">К оплате другими участниками:</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 4px;">
+                        ${pNames.map(n => `
+                            <div class="debt-pill" style="background: var(--bg-item); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; line-height: 1;">
+                                <span class="debt-name" style="font-size: 0.8rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px;">${n}</span>
+                                <span class="debt-amount" style="font-weight: 700; color: var(--primary); font-size: 0.8rem;">${totalsByParticipant[n].toFixed(2)} <small style="font-size: 0.65rem; opacity: 0.8;">SM</small></span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        function setCommission() {
+            commission = parseFloat(document.getElementById('commission').value) || 0;
+            pushToast('success', `Комиссия установлена: ${commission}%`);
+            updateUI();
+        }
+
+        // --- Editing ---
+        function openEdit(type, id, pName = '') {
+            const modal = document.getElementById('editModal');
+            document.getElementById('editType').value = type;
+            document.getElementById('editId').value = id;
+            document.getElementById('editParticipant').value = pName;
+
+            let data;
+            if (type === 'shared') {
+                data = sharedDishes[id];
+                document.getElementById('editName').value = data.sharedDishName;
+                document.getElementById('editCost').value = data.sharedDishCost;
+                document.getElementById('editQuantity').value = data.sharedDishQuantity;
+                document.getElementById('editModalTitle').innerText = 'Редактировать общее';
+            } else {
+                data = participants[pName][id];
+                document.getElementById('editName').value = data.dishName;
+                document.getElementById('editCost').value = data.dishCost;
+                document.getElementById('editQuantity').value = data.dishQuantity;
+                document.getElementById('editModalTitle').innerText = `Для ${pName}`;
+            }
+
+            openModal('editModal');
+        }
+
+        function saveEdit() {
+            const type = document.getElementById('editType').value;
+            const id = document.getElementById('editId').value;
+            const pName = document.getElementById('editParticipant').value;
+
+            const newName = document.getElementById('editName').value.trim();
+            const newCost = parseFloat(document.getElementById('editCost').value);
+            const newQty = parseInt(document.getElementById('editQuantity').value) || 1;
+
+            if (type === 'shared') {
+                sharedDishes[id] = { sharedDishName: newName, sharedDishCost: newCost, sharedDishQuantity: newQty };
+            } else {
+                participants[pName][id] = { dishName: newName, dishCost: newCost, dishQuantity: newQty };
+            }
+
+            closeModal('editModal');
+            updateUI();
+            pushToast('success', 'Изменения сохранены');
+        }
+
+        function deleteItem(type, id, pName = '') {
+            if (type === 'shared') {
+                sharedDishes.splice(id, 1);
+            } else {
+                participants[pName].splice(id, 1);
+                if (participants[pName].length === 0) delete participants[pName];
+            }
+            updateUI();
+        }
+
+        function deleteParticipant(name) {
+            if (confirm(`Удалить участника ${name} и все его блюда?`)) {
+                delete participants[name];
+                if (payer === name) payer = null;
+                updateUI();
+            }
+        }
+
+        function confirmClearAll() {
+            if (Object.keys(participants).length > 0 || sharedDishes.length > 0) {
+                if (confirm('Сохранить текущий чек в историю перед очисткой?')) {
+                    saveHistoryItem();
+                }
+            }
+
+            if (confirm('Вы уверены, что хотите очистить все данные?')) {
+                participants = {};
+                sharedDishes = [];
+                dishPrices = {};
+                commission = 0;
+                payer = null;
+                payerWallet = '';
+                restaurantName = ''; // Fixed: Reset restaurant name
+                checkDate = new Date().toISOString().split('T')[0]; // Reset to today
+
+                document.getElementById('commission').value = '';
+                document.getElementById('payerWallet').value = '';
+                document.getElementById('restaurantName').value = ''; // Clear input
+                document.getElementById('checkDate').value = checkDate;
+
+                updateUI();
+                pushToast('success', 'Все данные очищены');
+            }
+        }
+
+        // --- Modals & Toasts ---
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        function pushToast(type, message) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+            toast.innerHTML = `<i class="fas ${icon}"></i> <span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(20px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function toggleScreenshotMode() {
+            document.body.classList.toggle('screenshot-mode');
+            window.scrollTo(0, 0);
+        }
+
+        // Add Escape key listener to exit screenshot mode
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.body.classList.contains('screenshot-mode')) {
+                toggleScreenshotMode();
+            }
+        });
+
+        function downloadImage() {
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+
+            // Show loading state on button
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.style.opacity = '0.8';
+
+            html2canvas(document.body, {
+                backgroundColor: getComputedStyle(document.body).backgroundColor,
+                scale: 2, // Better quality
+                onclone: (clonedDoc) => {
+                    // Hide controls ONLY in the screenshot, not in the real DOM
+                    const exitControls = clonedDoc.querySelector('.screenshot-exit');
+                    if (exitControls) {
+                        // Use setProperty with 'important' to override the CSS !important
+                        exitControls.style.setProperty('display', 'none', 'important');
+                    }
+                }
+            }).then(canvas => {
+                // Restore button state
+                btn.innerHTML = originalText;
+                btn.style.opacity = '1';
+
+                // Download
+                const link = document.createElement('a');
+                link.download = `check_food_calc_${new Date().toISOString().slice(0, 10)}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+
+                pushToast('success', 'Чек сохранен!');
+            }).catch(err => {
+                console.error(err);
+                btn.innerHTML = originalText;
+                btn.style.opacity = '1';
+                pushToast('error', 'Ошибка при создании картинки');
+            });
+        }
+
+        function copyWallet() {
+            const val = document.getElementById('payerWallet').value;
+            if (!val) {
+                pushToast('error', 'Номер кошелька пуст');
+                return;
+            }
+            navigator.clipboard.writeText(val);
+            pushToast('success', 'Номер скопирован в буфер');
+        }
+
+        // Close modal on click outside
+        window.onclick = function (event) {
+            if (event.target.className === 'modal') {
+                event.target.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+
+</html>
