@@ -813,6 +813,44 @@
             transform: translateY(0);
         }
 
+        /* --- Participant Checkboxes --- */
+        .participants-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 4px 0;
+        }
+
+        .participants-checkboxes label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-item);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            text-transform: none;
+            letter-spacing: 0;
+            font-weight: 500;
+            color: var(--text-main);
+            opacity: 1;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .participants-checkboxes label:hover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .participants-checkboxes input[type="checkbox"] {
+            width: auto;
+            height: auto;
+            padding: 0;
+            accent-color: var(--primary);
+        }
+
         /* --- Utility --- */
         .hidden {
             display: none !important;
@@ -1275,7 +1313,7 @@
                             <i class="fas fa-plus"></i> Блюдо
                         </button>
                         <button class="btn btn-secondary" style="flex: 1; height: 38px;"
-                            onclick="openModal('sharedModal')">
+                            onclick="openSharedModal()">
                             <i class="fas fa-users"></i> Общее
                         </button>
                     </div>
@@ -1442,6 +1480,12 @@
                         <input type="number" id="sharedDishQuantity" value="1" min="1">
                     </div>
                 </div>
+                <div class="field">
+                    <label>Кто участвует?</label>
+                    <div id="sharedParticipantsCheckboxes" class="participants-checkboxes">
+                        <p style="font-size: 0.85rem; color: var(--text-muted);">Сначала добавьте участников</p>
+                    </div>
+                </div>
                 <button class="btn btn-primary" onclick="addSharedDish()">
                     <i class="fas fa-plus-circle"></i> Добавить общее блюдо
                 </button>
@@ -1481,6 +1525,10 @@
                         <label>Кол-во</label>
                         <input type="number" id="editQuantity" min="1">
                     </div>
+                </div>
+                <div class="field hidden" id="editParticipantsField">
+                    <label>Кто участвует?</label>
+                    <div id="editParticipantsCheckboxes" class="participants-checkboxes"></div>
                 </div>
                 <button class="btn btn-primary" onclick="saveEdit()">
                     <i class="fas fa-save"></i> Сохранить изменения
@@ -1720,6 +1768,22 @@
             updateUI();
         }
 
+        function openSharedModal() {
+            const container = document.getElementById('sharedParticipantsCheckboxes');
+            const pNames = Object.keys(participants);
+            if (pNames.length === 0) {
+                container.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted);">Сначала добавьте участников</p>';
+            } else {
+                container.innerHTML = pNames.map(n => `
+                    <label>
+                        <input type="checkbox" value="${n}" checked>
+                        ${n}
+                    </label>
+                `).join('');
+            }
+            openModal('sharedModal');
+        }
+
         function addSharedDish() {
             const dish = document.getElementById('sharedDishName').value.trim();
             const cost = parseFloat(document.getElementById('sharedDishCost').value);
@@ -1730,7 +1794,10 @@
                 return;
             }
 
-            sharedDishes.push({ sharedDishName: dish, sharedDishCost: cost, sharedDishQuantity: qty });
+            const checked = document.querySelectorAll('#sharedParticipantsCheckboxes input[type="checkbox"]:checked');
+            const selectedParticipants = Array.from(checked).map(cb => cb.value);
+
+            sharedDishes.push({ sharedDishName: dish, sharedDishCost: cost, sharedDishQuantity: qty, participants: selectedParticipants });
             dishPrices[dish] = cost;
 
             closeModal('sharedModal');
@@ -1744,16 +1811,8 @@
         }
 
         function calculateTotals() {
-            let subtotalPersonal = 0;
-            let subtotalShared = sharedDishes.reduce((acc, d) => acc + (d.sharedDishCost * d.sharedDishQuantity), 0);
-
             const pNames = Object.keys(participants);
             const participantCount = pNames.length;
-
-            // Shared per person
-            const sharedPerPerson = participantCount > 0 ? subtotalShared / participantCount : 0;
-            const sharedCommission = sharedPerPerson * (commission / 100);
-            const sharedFinal = sharedPerPerson + sharedCommission;
 
             totalBill = 0;
             totalsByParticipant = {};
@@ -1761,7 +1820,18 @@
             pNames.forEach(name => {
                 const personal = participants[name].reduce((acc, d) => acc + (d.dishCost * d.dishQuantity), 0);
                 const personalCommission = personal * (commission / 100);
-                const final = personal + personalCommission + sharedFinal;
+
+                // Each shared dish is split only among its own participants
+                let sharedForPerson = 0;
+                sharedDishes.forEach(d => {
+                    const dishParticipants = (d.participants && d.participants.length > 0) ? d.participants : pNames;
+                    if (dishParticipants.includes(name)) {
+                        sharedForPerson += (d.sharedDishCost * d.sharedDishQuantity) / dishParticipants.length;
+                    }
+                });
+
+                const sharedCommission = sharedForPerson * (commission / 100);
+                const final = personal + personalCommission + sharedForPerson + sharedCommission;
 
                 totalsByParticipant[name] = final;
                 totalBill += final;
@@ -1769,6 +1839,7 @@
 
             // If no participants but there are shared dishes, show shared in total
             if (participantCount === 0) {
+                const subtotalShared = sharedDishes.reduce((acc, d) => acc + (d.sharedDishCost * d.sharedDishQuantity), 0);
                 totalBill = subtotalShared + (subtotalShared * (commission / 100));
             }
         }
@@ -1842,15 +1913,26 @@
                 return;
             }
 
-            container.innerHTML = sharedDishes.map((d, i) => `
-                <div class="dish-item">
-                    <span><strong>${d.sharedDishQuantity}х</strong> ${d.sharedDishName} — ${(d.sharedDishCost * d.sharedDishQuantity).toFixed(2)} SM</span>
-                    <div class="dish-controls">
-                        <button class="icon-btn" onclick="openEdit('shared', ${i})"><i class="fas fa-edit"></i></button>
-                        <button class="icon-btn delete" onclick="deleteItem('shared', ${i})"><i class="fas fa-trash"></i></button>
+            const allPNames = Object.keys(participants);
+            container.innerHTML = sharedDishes.map((d, i) => {
+                const dishParticipants = (d.participants && d.participants.length > 0) ? d.participants : allPNames;
+                const participantsLabel = allPNames.length > 0 && dishParticipants.length === allPNames.length
+                    ? 'все участники'
+                    : dishParticipants.length > 0 ? dishParticipants.join(', ') : 'нет участников';
+                return `
+                <div class="dish-item" style="flex-direction: column; align-items: stretch; padding: 6px 8px; gap: 2px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span><strong>${d.sharedDishQuantity}х</strong> ${d.sharedDishName} — ${(d.sharedDishCost * d.sharedDishQuantity).toFixed(2)} SM</span>
+                        <div class="dish-controls">
+                            <button class="icon-btn" onclick="openEdit('shared', ${i})"><i class="fas fa-edit"></i></button>
+                            <button class="icon-btn delete" onclick="deleteItem('shared', ${i})"><i class="fas fa-trash"></i></button>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                    <div style="font-size: 0.75rem; color: var(--text-muted); padding-left: 2px;">
+                        <i class="fas fa-users" style="font-size: 0.7rem; margin-right: 4px;"></i>${participantsLabel}
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         function renderParticipantsList() {
@@ -1891,7 +1973,21 @@
                         </div>
                         <div class="summary-badge">
                             <div class="summary-row"><span>Промежуточный итог:</span><span>${personalSubtotal.toFixed(2)} SM</span></div>
-                            <div class="summary-row"><span>Доля общих + комиссия:</span><span>${(totalsByParticipant[name] - personalSubtotal * (1 + commission / 100)).toFixed(2)} SM</span></div>
+                            ${(() => {
+                                const pNames = Object.keys(participants);
+                                const sharedRows = sharedDishes.map(d => {
+                                    const dishParticipants = (d.participants && d.participants.length > 0) ? d.participants : pNames;
+                                    if (!dishParticipants.includes(name)) return '';
+                                    const share = (d.sharedDishCost * d.sharedDishQuantity) / dishParticipants.length;
+                                    const shareWithComm = share * (1 + commission / 100);
+                                    return `<div class="summary-row" style="padding-left: 10px; font-size: 0.8rem; opacity: 0.75;">
+                                        <span>└ ${d.sharedDishName} (1/${dishParticipants.length})</span>
+                                        <span>${shareWithComm.toFixed(2)} SM</span>
+                                    </div>`;
+                                }).join('');
+                                const sharedTotal = totalsByParticipant[name] - personalSubtotal * (1 + commission / 100);
+                                return `<div class="summary-row"><span>Доля общих + комиссия:</span><span>${sharedTotal.toFixed(2)} SM</span></div>${sharedRows}`;
+                            })()}
                             <div class="summary-total"><span>Итого к оплате:</span><span>${totalsByParticipant[name].toFixed(2)} SM</span></div>
                         </div>
                     </div>
@@ -2017,13 +2113,31 @@
             document.getElementById('editParticipant').value = pName;
 
             let data;
+            const editParticipantsField = document.getElementById('editParticipantsField');
             if (type === 'shared') {
                 data = sharedDishes[id];
                 document.getElementById('editName').value = data.sharedDishName;
                 document.getElementById('editCost').value = data.sharedDishCost;
                 document.getElementById('editQuantity').value = data.sharedDishQuantity;
                 document.getElementById('editModalTitle').innerText = 'Редактировать общее';
+
+                // Populate participants checkboxes
+                const pNames = Object.keys(participants);
+                const saved = data.participants && data.participants.length > 0 ? data.participants : pNames;
+                const container = document.getElementById('editParticipantsCheckboxes');
+                if (pNames.length === 0) {
+                    container.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted);">Нет участников</p>';
+                } else {
+                    container.innerHTML = pNames.map(n => `
+                        <label>
+                            <input type="checkbox" value="${n}" ${saved.includes(n) ? 'checked' : ''}>
+                            ${n}
+                        </label>
+                    `).join('');
+                }
+                editParticipantsField.classList.remove('hidden');
             } else {
+                editParticipantsField.classList.add('hidden');
                 data = participants[pName][id];
                 document.getElementById('editName').value = data.dishName;
                 document.getElementById('editCost').value = data.dishCost;
@@ -2044,155 +2158,5 @@
             const newQty = parseInt(document.getElementById('editQuantity').value) || 1;
 
             if (type === 'shared') {
-                sharedDishes[id] = { sharedDishName: newName, sharedDishCost: newCost, sharedDishQuantity: newQty };
-            } else {
-                participants[pName][id] = { dishName: newName, dishCost: newCost, dishQuantity: newQty };
-            }
-
-            closeModal('editModal');
-            updateUI();
-            pushToast('success', 'Изменения сохранены');
-        }
-
-        function deleteItem(type, id, pName = '') {
-            if (type === 'shared') {
-                sharedDishes.splice(id, 1);
-            } else {
-                participants[pName].splice(id, 1);
-                if (participants[pName].length === 0) delete participants[pName];
-            }
-            updateUI();
-        }
-
-        function deleteParticipant(name) {
-            if (confirm(`Удалить участника ${name} и все его блюда?`)) {
-                delete participants[name];
-                if (payer === name) payer = null;
-                updateUI();
-            }
-        }
-
-        function confirmClearAll() {
-            if (Object.keys(participants).length > 0 || sharedDishes.length > 0) {
-                if (confirm('Сохранить текущий чек в историю перед очисткой?')) {
-                    saveHistoryItem();
-                }
-            }
-
-            if (confirm('Вы уверены, что хотите очистить все данные?')) {
-                participants = {};
-                sharedDishes = [];
-                dishPrices = {};
-                commission = 0;
-                payer = null;
-                payerWallet = '';
-                restaurantName = ''; // Fixed: Reset restaurant name
-                checkDate = new Date().toISOString().split('T')[0]; // Reset to today
-
-                document.getElementById('commission').value = '';
-                document.getElementById('payerWallet').value = '';
-                document.getElementById('restaurantName').value = ''; // Clear input
-                document.getElementById('checkDate').value = checkDate;
-
-                updateUI();
-                pushToast('success', 'Все данные очищены');
-            }
-        }
-
-        // --- Modals & Toasts ---
-        function openModal(id) {
-            document.getElementById(id).style.display = 'flex';
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-        }
-
-        function pushToast(type, message) {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-
-            const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
-            toast.innerHTML = `<i class="fas ${icon}"></i> <span>${message}</span>`;
-
-            container.appendChild(toast);
-
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(20px)';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        function toggleScreenshotMode() {
-            document.body.classList.toggle('screenshot-mode');
-            window.scrollTo(0, 0);
-        }
-
-        // Add Escape key listener to exit screenshot mode
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.body.classList.contains('screenshot-mode')) {
-                toggleScreenshotMode();
-            }
-        });
-
-        function downloadImage() {
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-
-            // Show loading state on button
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btn.style.opacity = '0.8';
-
-            html2canvas(document.body, {
-                backgroundColor: getComputedStyle(document.body).backgroundColor,
-                scale: 2, // Better quality
-                onclone: (clonedDoc) => {
-                    // Hide controls ONLY in the screenshot, not in the real DOM
-                    const exitControls = clonedDoc.querySelector('.screenshot-exit');
-                    if (exitControls) {
-                        // Use setProperty with 'important' to override the CSS !important
-                        exitControls.style.setProperty('display', 'none', 'important');
-                    }
-                }
-            }).then(canvas => {
-                // Restore button state
-                btn.innerHTML = originalText;
-                btn.style.opacity = '1';
-
-                // Download
-                const link = document.createElement('a');
-                link.download = `check_food_calc_${new Date().toISOString().slice(0, 10)}.png`;
-                link.href = canvas.toDataURL();
-                link.click();
-
-                pushToast('success', 'Чек сохранен!');
-            }).catch(err => {
-                console.error(err);
-                btn.innerHTML = originalText;
-                btn.style.opacity = '1';
-                pushToast('error', 'Ошибка при создании картинки');
-            });
-        }
-
-        function copyWallet() {
-            const val = document.getElementById('payerWallet').value;
-            if (!val) {
-                pushToast('error', 'Номер кошелька пуст');
-                return;
-            }
-            navigator.clipboard.writeText(val);
-            pushToast('success', 'Номер скопирован в буфер');
-        }
-
-        // Close modal on click outside
-        window.onclick = function (event) {
-            if (event.target.className === 'modal') {
-                event.target.style.display = 'none';
-            }
-        };
-    </script>
-</body>
-
-</html>
+                const checked = document.querySelectorAll('#editParticipantsCheckboxes input[type="checkbox"]:checked');
+                const selectedParticipants = Array
