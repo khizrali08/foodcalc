@@ -1481,6 +1481,12 @@
                         <input type="number" id="sharedDishQuantity" value="1" min="1">
                     </div>
                 </div>
+                <div class="field">
+                    <label>Кто участвует?</label>
+                    <div id="sharedParticipantsCheckboxes" class="participants-checkboxes">
+                        <p style="font-size: 0.85rem; color: var(--text-muted);">Сначала добавьте участников</p>
+                    </div>
+                </div>
                 <button class="btn btn-primary" onclick="addSharedDish()">
                     <i class="fas fa-plus-circle"></i> Добавить общее блюдо
                 </button>
@@ -2284,17 +2290,4 @@
                 pushToast('error', 'Номер кошелька пуст');
                 return;
             }
-            navigator.clipboard.writeText(val);
-            pushToast('success', 'Номер скопирован в буфер');
-        }
-
-        // Close modal on click outside
-        window.onclick = function (event) {
-            if (event.target.className === 'modal') {
-                event.target.style.display = 'none';
-            }
-        };
-    </script>
-</body>
-
-</html>
+          
