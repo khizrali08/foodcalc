@@ -813,7 +813,6 @@
             transform: translateY(0);
         }
 
-
         /* --- Participant Checkboxes --- */
         .participants-checkboxes {
             display: flex;
@@ -821,7 +820,6 @@
             gap: 8px;
             padding: 4px 0;
         }
-
         .participants-checkboxes label {
             display: flex;
             align-items: center;
@@ -839,12 +837,10 @@
             opacity: 1;
             transition: border-color 0.2s, background 0.2s;
         }
-
         .participants-checkboxes label:hover {
             border-color: var(--primary);
             background: var(--primary-light);
         }
-
         .participants-checkboxes input[type="checkbox"] {
             width: auto;
             height: auto;
@@ -1775,12 +1771,9 @@
             if (pNames.length === 0) {
                 container.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted);">Сначала добавьте участников</p>';
             } else {
-                container.innerHTML = pNames.map(n => `
-                    <label>
-                        <input type="checkbox" value="${n}" checked>
-                        ${n}
-                    </label>
-                `).join('');
+                container.innerHTML = pNames.map(n =>
+                    '<label><input type="checkbox" value="' + n + '" checked> ' + n + '</label>'
+                ).join('');
             }
             openModal('sharedModal');
         }
@@ -1797,7 +1790,6 @@
 
             const checked = document.querySelectorAll('#sharedParticipantsCheckboxes input[type="checkbox"]:checked');
             const selectedParticipants = Array.from(checked).map(cb => cb.value);
-
             sharedDishes.push({ sharedDishName: dish, sharedDishCost: cost, sharedDishQuantity: qty, participants: selectedParticipants });
             dishPrices[dish] = cost;
 
@@ -1814,25 +1806,21 @@
         function calculateTotals() {
             const pNames = Object.keys(participants);
             const participantCount = pNames.length;
-
             totalBill = 0;
             totalsByParticipant = {};
 
             pNames.forEach(name => {
                 const personal = participants[name].reduce((acc, d) => acc + (d.dishCost * d.dishQuantity), 0);
                 const personalCommission = personal * (commission / 100);
-
                 let sharedForPerson = 0;
                 sharedDishes.forEach(d => {
-                    const dishParticipants = (d.participants && d.participants.length > 0) ? d.participants : pNames;
-                    if (dishParticipants.includes(name)) {
-                        sharedForPerson += (d.sharedDishCost * d.sharedDishQuantity) / dishParticipants.length;
+                    const dp = (d.participants && d.participants.length > 0) ? d.participants : pNames;
+                    if (dp.includes(name)) {
+                        sharedForPerson += (d.sharedDishCost * d.sharedDishQuantity) / dp.length;
                     }
                 });
-
                 const sharedCommission = sharedForPerson * (commission / 100);
                 const final = personal + personalCommission + sharedForPerson + sharedCommission;
-
                 totalsByParticipant[name] = final;
                 totalBill += final;
             });
@@ -1914,21 +1902,20 @@
 
             const allPNames = Object.keys(participants);
             container.innerHTML = sharedDishes.map((d, i) => {
-                const dishParticipants = (d.participants && d.participants.length > 0) ? d.participants : allPNames;
-                const participantsLabel = allPNames.length > 0 && dishParticipants.length === allPNames.length
+                const dp = (d.participants && d.participants.length > 0) ? d.participants : allPNames;
+                const label = allPNames.length > 0 && dp.length === allPNames.length
                     ? 'все участники'
-                    : dishParticipants.length > 0 ? dishParticipants.join(', ') : 'нет участников';
-                return `
-                <div class="dish-item" style="flex-direction: column; align-items: stretch; padding: 6px 8px; gap: 2px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    : dp.length > 0 ? dp.join(', ') : 'нет участников';
+                return `<div class="dish-item" style="flex-direction:column;align-items:stretch;padding:6px 8px;gap:2px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
                         <span><strong>${d.sharedDishQuantity}х</strong> ${d.sharedDishName} — ${(d.sharedDishCost * d.sharedDishQuantity).toFixed(2)} SM</span>
                         <div class="dish-controls">
                             <button class="icon-btn" onclick="openEdit('shared', ${i})"><i class="fas fa-edit"></i></button>
                             <button class="icon-btn delete" onclick="deleteItem('shared', ${i})"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted); padding-left: 2px;">
-                        <i class="fas fa-users" style="font-size: 0.7rem; margin-right: 4px;"></i>${participantsLabel}
+                    <div style="font-size:0.75rem;color:var(--text-muted);padding-left:2px;">
+                        <i class="fas fa-users" style="font-size:0.7rem;margin-right:4px;"></i>` + label + `
                     </div>
                 </div>`;
             }).join('');
@@ -1972,18 +1959,13 @@
                         </div>
                         <div class="summary-badge">
                             <div class="summary-row"><span>Промежуточный итог:</span><span>${personalSubtotal.toFixed(2)} SM</span></div>
-                            ${(() => {
-                                const pNames = Object.keys(participants);
-                                const sharedRows = sharedDishes.map(d => {
-                                    const dishParticipants = (d.participants && d.participants.length > 0) ? d.participants : pNames;
-                                    if (!dishParticipants.includes(name)) return '';
-                                    const share = (d.sharedDishCost * d.sharedDishQuantity) / dishParticipants.length;
-                                    const shareWithComm = share * (1 + commission / 100);
-                                    return '<div class="summary-row" style="padding-left: 10px; font-size: 0.8rem; opacity: 0.75;"><span>└ ' + d.sharedDishName + ' (1/' + dishParticipants.length + ')</span><span>' + shareWithComm.toFixed(2) + ' SM</span></div>';
-                                }).join('');
-                                const sharedTotal = totalsByParticipant[name] - personalSubtotal * (1 + commission / 100);
-                                return '<div class="summary-row"><span>Доля общих + комиссия:</span><span>' + sharedTotal.toFixed(2) + ' SM</span></div>' + sharedRows;
-                            })()}
+                            <div class="summary-row"><span>Доля общих + комиссия:</span><span>${(totalsByParticipant[name] - personalSubtotal * (1 + commission / 100)).toFixed(2)} SM</span></div>
+                            ${sharedDishes.map(d => {
+                                const dp = (d.participants && d.participants.length > 0) ? d.participants : Object.keys(participants);
+                                if (!dp.includes(name)) return '';
+                                const share = (d.sharedDishCost * d.sharedDishQuantity) / dp.length * (1 + commission / 100);
+                                return '<div class="summary-row" style="padding-left:10px;font-size:0.8rem;opacity:0.75;"><span>└ ' + d.sharedDishName + ' (1/' + dp.length + ')</span><span>' + share.toFixed(2) + ' SM</span></div>';
+                            }).join('')}
                             <div class="summary-total"><span>Итого к оплате:</span><span>${totalsByParticipant[name].toFixed(2)} SM</span></div>
                         </div>
                     </div>
@@ -2116,17 +2098,12 @@
                 document.getElementById('editCost').value = data.sharedDishCost;
                 document.getElementById('editQuantity').value = data.sharedDishQuantity;
                 document.getElementById('editModalTitle').innerText = 'Редактировать общее';
-
                 const pNames = Object.keys(participants);
-                const saved = data.participants && data.participants.length > 0 ? data.participants : pNames;
-                const container = document.getElementById('editParticipantsCheckboxes');
-                if (pNames.length === 0) {
-                    container.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted);">Нет участников</p>';
-                } else {
-                    container.innerHTML = pNames.map(n =>
-                        '<label><input type="checkbox" value="' + n + '"' + (saved.includes(n) ? ' checked' : '') + '> ' + n + '</label>'
-                    ).join('');
-                }
+                const saved = (data.participants && data.participants.length > 0) ? data.participants : pNames;
+                const cont = document.getElementById('editParticipantsCheckboxes');
+                cont.innerHTML = pNames.length === 0
+                    ? '<p style="font-size:0.85rem;color:var(--text-muted);">Нет участников</p>'
+                    : pNames.map(n => '<label><input type="checkbox" value="' + n + '"' + (saved.includes(n) ? ' checked' : '') + '> ' + n + '</label>').join('');
                 editParticipantsField.classList.remove('hidden');
             } else {
                 editParticipantsField.classList.add('hidden');
@@ -2290,4 +2267,17 @@
                 pushToast('error', 'Номер кошелька пуст');
                 return;
             }
-          
+            navigator.clipboard.writeText(val);
+            pushToast('success', 'Номер скопирован в буфер');
+        }
+
+        // Close modal on click outside
+        window.onclick = function (event) {
+            if (event.target.className === 'modal') {
+                event.target.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+
+</html>
