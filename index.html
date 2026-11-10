@@ -1335,7 +1335,7 @@
                     <div class="field" style="flex: 1; min-width: 180px;">
                         <label>Реквизиты</label>
                         <div class="input-with-btn">
-                            <input type="text" id="payerWallet" placeholder="Карта...">
+                            <input type="text" id="payerWallet" class="ym-disable-keys" placeholder="Карта..." autocomplete="off">
                             <button class="btn btn-secondary btn-icon-only" onclick="copyWallet()" title="Копировать">
                                 <i class="fas fa-copy" style="font-size: 0.9rem;"></i>
                             </button>
@@ -1344,16 +1344,14 @@
                     <div class="field" style="flex: 1; min-width: 130px; max-width: 150px;">
                         <label>Сервис (%)</label>
                         <div class="input-with-btn">
-                            <input type="number" id="commission" placeholder="0" min="0">
+                            <input type="number" id="commission" placeholder="0" min="0" oninput="applyCommissionLive()">
                             <button class="btn btn-secondary btn-icon-only" onclick="setCommission()" title="Применить">
                                 <i class="fas fa-check" style="font-size: 0.9rem;"></i>
                             </button>
                         </div>
                     </div>
                 </div>
-
-    </div>
-    </section>
+            </section>
 
     <!-- Right Column: Lists -->
     <section class="list-column">
@@ -1371,7 +1369,7 @@
                     <div id="walletDisplayBox"
                         style="font-size: 0.85rem; color: var(--text-muted); background: var(--bg-item); padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border); font-family: monospace; display: flex; align-items: center;">
                         <i class="fas fa-wallet" style="font-size: 0.75rem; margin-right: 6px; opacity: 0.7;"></i>
-                        <span id="payerWalletDisplay">не указан</span>
+                        <span id="payerWalletDisplay" class="ym-hide-content">не указан</span>
                     </div>
 
                     <div id="payerReimbursementBadge" class="reimbursement-badge"
@@ -1561,6 +1559,32 @@
         let restaurantName = '';
         let checkDate = ''; // YYYY-MM-DD
 
+        // --- Helpers ---
+        // Экранирование пользовательского текста перед вставкой в innerHTML
+        function esc(v) {
+            return String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        // Безопасный аргумент для onclick="fn(...)": строка в JSON + экранирование для атрибута
+        function jsArg(v) {
+            return esc(JSON.stringify(v));
+        }
+        // Сегодняшняя дата по местному времени (toISOString даёт UTC и после полуночи показывает вчера)
+        function todayLocal() {
+            const d = new Date();
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+        // Кто реально участвует в общем блюде: только существующие участники; пустой список = все
+        function sharedParticipantsOf(dish, pNames) {
+            const dp = (dish.participants || []).filter(n => pNames.includes(n));
+            return dp.length > 0 ? dp : pNames;
+        }
+        // Убрать удалённого участника из всех общих блюд
+        function removeFromShared(name) {
+            sharedDishes.forEach(d => {
+                if (d.participants) d.participants = d.participants.filter(n => n !== name);
+            });
+        }
+
         // Theme Initialization
         const savedTheme = localStorage.getItem('foodCalc_theme') || 'dark';
         document.documentElement.setAttribute('data-theme', savedTheme);
@@ -1610,7 +1634,7 @@
             payer = localStorage.getItem('gs_payer') || null;
             payerWallet = localStorage.getItem('gs_payerWallet') || '';
             restaurantName = localStorage.getItem('gs_restaurantName') || '';
-            checkDate = localStorage.getItem('gs_checkDate') || new Date().toISOString().split('T')[0];
+            checkDate = localStorage.getItem('gs_checkDate') || todayLocal();
 
             // Set initial input values
             document.getElementById('commission').value = commission || '';
@@ -1685,8 +1709,8 @@
                 <div class="item-card" style="margin-bottom: 10px; cursor: pointer;" onclick="loadHistoryItem(${item.id})">
                     <div class="item-header">
                         <div>
-                            <span class="item-name">${item.title}</span>
-                            <div style="font-size: 0.8rem; color: var(--text-muted);">${item.date}</div>
+                            <span class="item-name">${esc(item.title)}</span>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">${esc(item.date)}</div>
                         </div>
                         <div style="text-align: right;">
                             <div style="font-weight: bold; color: var(--primary);">${item.total.toFixed(2)} SM</div>
@@ -1712,7 +1736,7 @@
                 payer = d.payer || null;
                 payerWallet = d.payerWallet || '';
                 restaurantName = d.restaurantName || '';
-                checkDate = d.checkDate || new Date().toISOString().split('T')[0];
+                checkDate = d.checkDate || todayLocal();
 
                 // Update inputs
                 document.getElementById('commission').value = commission;
@@ -1772,7 +1796,7 @@
                 container.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted);">Сначала добавьте участников</p>';
             } else {
                 container.innerHTML = pNames.map(n =>
-                    '<label><input type="checkbox" value="' + n + '" checked> ' + n + '</label>'
+                    '<label><input type="checkbox" value="' + esc(n) + '" checked> ' + esc(n) + '</label>'
                 ).join('');
             }
             openModal('sharedModal');
@@ -1790,6 +1814,10 @@
 
             const checked = document.querySelectorAll('#sharedParticipantsCheckboxes input[type="checkbox"]:checked');
             const selectedParticipants = Array.from(checked).map(cb => cb.value);
+            if (Object.keys(participants).length > 0 && selectedParticipants.length === 0) {
+                pushToast('error', 'Отметьте хотя бы одного участника');
+                return;
+            }
             sharedDishes.push({ sharedDishName: dish, sharedDishCost: cost, sharedDishQuantity: qty, participants: selectedParticipants });
             dishPrices[dish] = cost;
 
@@ -1814,7 +1842,7 @@
                 const personalCommission = personal * (commission / 100);
                 let sharedForPerson = 0;
                 sharedDishes.forEach(d => {
-                    const dp = (d.participants && d.participants.length > 0) ? d.participants : pNames;
+                    const dp = sharedParticipantsOf(d, pNames);
                     if (dp.includes(name)) {
                         sharedForPerson += (d.sharedDishCost * d.sharedDishQuantity) / dp.length;
                     }
@@ -1849,12 +1877,7 @@
             updatePayerSelect();
             updatePayerUI();
 
-            const restDisplay = document.getElementById('restaurantNameDisplay');
-            if (restaurantName) {
-                restDisplay.innerText = `📍 ${restaurantName}`;
-            } else {
-                restDisplay.innerText = '';
-            }
+            renderRestaurantBadge();
 
             // Update Screenshot Date & Header Date
             const [y, m, d] = checkDate.split('-');
@@ -1879,13 +1902,14 @@
         function updateRestaurantName() {
             restaurantName = document.getElementById('restaurantName').value;
             saveToStorage();
+            renderRestaurantBadge();
+        }
 
-            const restDisplay = document.getElementById('restaurantNameDisplay');
-            if (restaurantName) {
-                restDisplay.innerText = `📍 ${restaurantName}`;
-            } else {
-                restDisplay.innerText = '';
-            }
+        function renderRestaurantBadge() {
+            const badge = document.getElementById('restaurantBadge');
+            const display = document.getElementById('restaurantNameDisplay');
+            badge.style.display = restaurantName ? 'flex' : 'none';
+            display.innerText = restaurantName ? `📍 ${restaurantName}` : '';
         }
 
         function renderSharedList() {
@@ -1902,13 +1926,13 @@
 
             const allPNames = Object.keys(participants);
             container.innerHTML = sharedDishes.map((d, i) => {
-                const dp = (d.participants && d.participants.length > 0) ? d.participants : allPNames;
-                const label = allPNames.length > 0 && dp.length === allPNames.length
+                const dp = sharedParticipantsOf(d, allPNames);
+                const label = allPNames.length > 0 && allPNames.every(n => dp.includes(n))
                     ? 'все участники'
-                    : dp.length > 0 ? dp.join(', ') : 'нет участников';
+                    : dp.length > 0 ? dp.map(esc).join(', ') : 'нет участников';
                 return `<div class="dish-item" style="flex-direction:column;align-items:stretch;padding:6px 8px;gap:2px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <span><strong>${d.sharedDishQuantity}х</strong> ${d.sharedDishName} — ${(d.sharedDishCost * d.sharedDishQuantity).toFixed(2)} SM</span>
+                        <span><strong>${d.sharedDishQuantity}х</strong> ${esc(d.sharedDishName)} — ${(d.sharedDishCost * d.sharedDishQuantity).toFixed(2)} SM</span>
                         <div class="dish-controls">
                             <button class="icon-btn" onclick="openEdit('shared', ${i})"><i class="fas fa-edit"></i></button>
                             <button class="icon-btn delete" onclick="deleteItem('shared', ${i})"><i class="fas fa-trash"></i></button>
@@ -1943,16 +1967,16 @@
                 return `
                     <div class="item-card ${isPayer ? 'payer-card' : ''}">
                         <div class="item-header">
-                            <span class="item-name">${name}</span>
-                            <button class="icon-btn delete" onclick="deleteParticipant('${name}')"><i class="fas fa-user-minus"></i></button>
+                            <span class="item-name">${esc(name)}</span>
+                            <button class="icon-btn delete" onclick="deleteParticipant(${jsArg(name)})"><i class="fas fa-user-minus"></i></button>
                         </div>
                         <div class="dish-list">
                             ${dishes.map((d, idx) => `
                                 <div class="dish-item">
-                                    <span>${d.sharedDishQuantity || d.dishQuantity}х ${d.dishName} — ${(d.dishCost * d.dishQuantity).toFixed(2)} SM</span>
+                                    <span>${d.dishQuantity}х ${esc(d.dishName)} — ${(d.dishCost * d.dishQuantity).toFixed(2)} SM</span>
                                     <div class="dish-controls">
-                                        <button class="icon-btn" onclick="openEdit('personal', ${idx}, '${name}')"><i class="fas fa-edit"></i></button>
-                                        <button class="icon-btn delete" onclick="deleteItem('personal', ${idx}, '${name}')"><i class="fas fa-trash"></i></button>
+                                        <button class="icon-btn" onclick="openEdit('personal', ${idx}, ${jsArg(name)})"><i class="fas fa-edit"></i></button>
+                                        <button class="icon-btn delete" onclick="deleteItem('personal', ${idx}, ${jsArg(name)})"><i class="fas fa-trash"></i></button>
                                     </div>
                                 </div>
                             `).join('')}
@@ -1961,10 +1985,10 @@
                             <div class="summary-row"><span>Промежуточный итог:</span><span>${personalSubtotal.toFixed(2)} SM</span></div>
                             <div class="summary-row"><span>Доля общих + комиссия:</span><span>${(totalsByParticipant[name] - personalSubtotal * (1 + commission / 100)).toFixed(2)} SM</span></div>
                             ${sharedDishes.map(d => {
-                                const dp = (d.participants && d.participants.length > 0) ? d.participants : Object.keys(participants);
+                                const dp = sharedParticipantsOf(d, Object.keys(participants));
                                 if (!dp.includes(name)) return '';
                                 const share = (d.sharedDishCost * d.sharedDishQuantity) / dp.length * (1 + commission / 100);
-                                return '<div class="summary-row" style="padding-left:10px;font-size:0.8rem;opacity:0.75;"><span>└ ' + d.sharedDishName + ' (1/' + dp.length + ')</span><span>' + share.toFixed(2) + ' SM</span></div>';
+                                return '<div class="summary-row" style="padding-left:10px;font-size:0.8rem;opacity:0.75;"><span>└ ' + esc(d.sharedDishName) + ' (1/' + dp.length + ')</span><span>' + share.toFixed(2) + ' SM</span></div>';
                             }).join('')}
                             <div class="summary-total"><span>Итого к оплате:</span><span>${totalsByParticipant[name].toFixed(2)} SM</span></div>
                         </div>
@@ -1977,8 +2001,8 @@
             const pList = document.getElementById('participantsDatalist');
             const dList = document.getElementById('dishNamesDatalist');
 
-            pList.innerHTML = Object.keys(participants).map(n => `<option value="${n}">`).join('');
-            dList.innerHTML = Object.keys(dishPrices).map(d => `<option value="${d}">`).join('');
+            pList.innerHTML = Object.keys(participants).map(n => `<option value="${esc(n)}">`).join('');
+            dList.innerHTML = Object.keys(dishPrices).map(d => `<option value="${esc(d)}">`).join('');
         }
 
         // Автозаполнение цены при изменении названия блюда
@@ -2000,23 +2024,7 @@
                 opt.innerText = n;
                 select.appendChild(opt);
             });
-            function updateRestaurantName() {
-                restaurantName = document.getElementById('restaurantName').value;
-                saveToStorage();
-
-                const badge = document.getElementById('restaurantBadge');
-                const display = document.getElementById('restaurantNameDisplay');
-
-                if (restaurantName) {
-                    badge.style.display = 'flex';
-                    display.innerText = restaurantName;
-                } else {
-                    badge.style.display = 'none';
-                }
-            }
-
             select.value = current || "";
-            updateRestaurantName();
         }
 
         function updatePayer() {
@@ -2043,7 +2051,7 @@
             // Show/Hide wallet
             const walletBox = document.getElementById('walletDisplayBox');
             if (payerWallet) {
-                walletBox.style.display = 'block';
+                walletBox.style.display = 'flex';
                 document.getElementById('payerWalletDisplay').innerText = payerWallet;
             } else {
                 walletBox.style.display = 'none';
@@ -2068,13 +2076,18 @@
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 4px;">
                         ${pNames.map(n => `
                             <div class="debt-pill" style="background: var(--bg-item); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; line-height: 1;">
-                                <span class="debt-name" style="font-size: 0.8rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px;">${n}</span>
+                                <span class="debt-name" style="font-size: 0.8rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px;">${esc(n)}</span>
                                 <span class="debt-amount" style="font-weight: 700; color: var(--primary); font-size: 0.8rem;">${totalsByParticipant[n].toFixed(2)} <small style="font-size: 0.65rem; opacity: 0.8;">SM</small></span>
                             </div>
                         `).join('')}
                     </div>
                 `;
             }
+        }
+
+        function applyCommissionLive() {
+            commission = parseFloat(document.getElementById('commission').value) || 0;
+            updateUI();
         }
 
         function setCommission() {
@@ -2099,11 +2112,11 @@
                 document.getElementById('editQuantity').value = data.sharedDishQuantity;
                 document.getElementById('editModalTitle').innerText = 'Редактировать общее';
                 const pNames = Object.keys(participants);
-                const saved = (data.participants && data.participants.length > 0) ? data.participants : pNames;
+                const saved = sharedParticipantsOf(data, pNames);
                 const cont = document.getElementById('editParticipantsCheckboxes');
                 cont.innerHTML = pNames.length === 0
                     ? '<p style="font-size:0.85rem;color:var(--text-muted);">Нет участников</p>'
-                    : pNames.map(n => '<label><input type="checkbox" value="' + n + '"' + (saved.includes(n) ? ' checked' : '') + '> ' + n + '</label>').join('');
+                    : pNames.map(n => '<label><input type="checkbox" value="' + esc(n) + '"' + (saved.includes(n) ? ' checked' : '') + '> ' + esc(n) + '</label>').join('');
                 editParticipantsField.classList.remove('hidden');
             } else {
                 editParticipantsField.classList.add('hidden');
@@ -2129,6 +2142,10 @@
             if (type === 'shared') {
                 const editChecked = document.querySelectorAll('#editParticipantsCheckboxes input[type="checkbox"]:checked');
                 const selectedParticipants = Array.from(editChecked).map(cb => cb.value);
+                if (Object.keys(participants).length > 0 && selectedParticipants.length === 0) {
+                    pushToast('error', 'Отметьте хотя бы одного участника');
+                    return;
+                }
                 sharedDishes[id] = { sharedDishName: newName, sharedDishCost: newCost, sharedDishQuantity: newQty, participants: selectedParticipants };
             } else {
                 participants[pName][id] = { dishName: newName, dishCost: newCost, dishQuantity: newQty };
@@ -2144,7 +2161,11 @@
                 sharedDishes.splice(id, 1);
             } else {
                 participants[pName].splice(id, 1);
-                if (participants[pName].length === 0) delete participants[pName];
+                if (participants[pName].length === 0) {
+                    delete participants[pName];
+                    removeFromShared(pName);
+                    if (payer === pName) payer = null;
+                }
             }
             updateUI();
         }
@@ -2152,6 +2173,7 @@
         function deleteParticipant(name) {
             if (confirm(`Удалить участника ${name} и все его блюда?`)) {
                 delete participants[name];
+                removeFromShared(name);
                 if (payer === name) payer = null;
                 updateUI();
             }
@@ -2172,7 +2194,7 @@
                 payer = null;
                 payerWallet = '';
                 restaurantName = ''; // Fixed: Reset restaurant name
-                checkDate = new Date().toISOString().split('T')[0]; // Reset to today
+                checkDate = todayLocal(); // Reset to today
 
                 document.getElementById('commission').value = '';
                 document.getElementById('payerWallet').value = '';
@@ -2199,7 +2221,8 @@
             toast.className = `toast ${type}`;
 
             const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
-            toast.innerHTML = `<i class="fas ${icon}"></i> <span>${message}</span>`;
+            toast.innerHTML = `<i class="fas ${icon}"></i> <span></span>`;
+            toast.querySelector('span').textContent = message;
 
             container.appendChild(toast);
 
@@ -2248,7 +2271,7 @@
 
                 // Download
                 const link = document.createElement('a');
-                link.download = `check_food_calc_${new Date().toISOString().slice(0, 10)}.png`;
+                link.download = `check_food_calc_${checkDate || todayLocal()}.png`;
                 link.href = canvas.toDataURL();
                 link.click();
 
