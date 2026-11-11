@@ -13,7 +13,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -74,6 +74,10 @@
 
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: end;">
                     <div style="display: flex; gap: 8px; margin-bottom: 0;">
+                        <button class="btn btn-primary" style="flex: 1; height: 38px; background: var(--secondary);"
+                            onclick="openReceipt()" title="Сфотографировать чек и разметить, кто что ел">
+                            <i class="fas fa-camera"></i> Чек
+                        </button>
                         <button class="btn btn-primary" style="flex: 1; height: 38px;"
                             onclick="openModal('participantModal')">
                             <i class="fas fa-plus"></i> Блюдо
@@ -270,6 +274,39 @@
         </div>
     </div>
 
+    <div id="receiptModal" class="modal">
+        <div class="modal-content modal-wide">
+            <button class="modal-close" onclick="closeModal('receiptModal')">&times;</button>
+            <h2>🧾 Чек</h2>
+            <div class="rc-toolbar">
+                <label class="btn btn-primary rc-photo-btn">
+                    <i class="fas fa-camera"></i> Фото чека
+                    <input type="file" accept="image/*" hidden onchange="receiptFromPhoto(this)">
+                </label>
+                <button class="btn btn-secondary" onclick="receiptReset()"><i class="fas fa-eraser"></i> Очистить</button>
+            </div>
+            <div class="rc-ai" id="receiptAi"></div>
+            <div class="rc-ai-setup hidden" id="receiptAiSetup">
+                <p>Gemini читает чеки почти без ошибок. Ключ бесплатный: откройте
+                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>,
+                    войдите через Google, нажмите «Create API key» и вставьте ключ сюда.</p>
+                <p class="rc-muted">Ключ хранится только на этом устройстве. Фото чека отправляется в Google.</p>
+                <div class="input-with-btn">
+                    <input id="rcGeminiKeyInput" type="password" placeholder="AIza…" autocomplete="off" class="ym-disable-keys">
+                    <button class="btn btn-primary" onclick="rcSaveGeminiKey()">Сохранить</button>
+                </div>
+            </div>
+            <div class="rc-progress hidden" id="receiptProgress"><div class="rc-bar"></div><span></span></div>
+            <div id="receiptBody"></div>
+            <div class="rc-footer">
+                <div id="receiptSummary"></div>
+                <button class="btn btn-primary rc-apply" onclick="receiptApply()">
+                    <i class="fas fa-check"></i> Готово — в расчёт
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="editModal" class="modal">
         <div class="modal-content">
             <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
@@ -321,6 +358,8 @@
     </div>
 
     <script src="app.js?v=4"></script>
+    <script src="receipt-parse.js?v=1"></script>
+    <script src="receipt.js?v=1"></script>
 </body>
 
 </html>
