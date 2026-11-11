@@ -755,6 +755,9 @@ function checkFileName() {
 }
 
 function canShareFiles() {
+    // Только телефоны и планшеты: на компьютерах браузеры иногда заявляют поддержку,
+    // но отправка не работает, а «Скачать» там и так удобнее
+    if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return false;
     try {
         return !!(navigator.canShare && navigator.canShare({
             files: [new File([''], 'check.png', { type: 'image/png' })]
@@ -824,13 +827,27 @@ function shareImage(e) {
                 pushToast('success', 'Картинка готова — нажмите «Поделиться» ещё раз');
                 return;
             }
-            throw err;
+            // Поделиться не вышло — просто скачиваем картинку
+            console.error(err);
+            saveFile(file);
+            pushToast('success', 'Поделиться не получилось — картинка скачана');
         });
     }).catch(err => {
         console.error(err);
         setBusy(btn, false);
-        pushToast('error', 'Не удалось поделиться картинкой');
+        pushToast('error', 'Ошибка при создании картинки');
     });
+}
+
+function saveFile(file) {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.download = file.name;
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 // Add Escape key listener to exit screenshot mode
@@ -845,14 +862,7 @@ function downloadImage(e) {
     setBusy(btn, true);
     getCheckImage().then(file => {
         setBusy(btn, false);
-        const url = URL.createObjectURL(file);
-        const link = document.createElement('a');
-        link.download = file.name;
-        link.href = url;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        saveFile(file);
         pushToast('success', 'Чек сохранен!');
     }).catch(err => {
         console.error(err);
