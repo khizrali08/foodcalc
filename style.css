@@ -932,6 +932,12 @@ body.screenshot-mode .payer-info-header {
     margin-bottom: 0 !important;
 }
 
+/* Пустые «Место» и «Реквизиты» на скриншоте не показываем */
+body.screenshot-mode .payer-info-box #restaurantBadge.is-empty,
+body.screenshot-mode .payer-info-box #walletDisplayBox.is-empty {
+    display: none !important;
+}
+
 body.screenshot-mode .payer-info-box #restaurantBadge i,
 body.screenshot-mode .payer-info-box #walletDisplayBox i {
     color: var(--text-muted) !important;
@@ -953,6 +959,17 @@ body.screenshot-mode .container {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 40px !important;
+}
+
+/* На телефоне большие отступы съедали ширину, и суммы в карточках обрезались */
+@media (max-width: 600px) {
+    body.screenshot-mode {
+        padding: 12px !important;
+    }
+
+    body.screenshot-mode .container {
+        padding: 0 !important;
+    }
 }
 
 body.screenshot-mode .topbar,
@@ -1169,6 +1186,8 @@ body.screenshot-mode .payer-card {
 }
 
 .exit-btn {
+    width: auto !important; /* у .btn стоит width: 100%, из-за чего кнопки панели сжимались */
+    flex-shrink: 0 !important;
     background: #10b981 !important;
     color: white !important;
     border-radius: 999px !important;
@@ -1227,4 +1246,29 @@ body.screenshot-mode .header-section p {
 
 body.screenshot-mode .screenshot-exit {
     display: flex !important;
+}
+
+.exit-btn.is-hidden {
+    display: none !important;
+}
+
+/* На телефоне с кнопкой «Поделиться» оставляем подпись только у неё */
+@media (max-width: 480px) {
+    .screenshot-exit {
+        right: 16px;
+        bottom: 16px;
+        gap: 10px;
+    }
+
+    .screenshot-exit.has-share .exit-btn-download,
+    .screenshot-exit.has-share .exit-btn-close {
+        width: 48px !important;
+        padding: 0 !important;
+        justify-content: center !important;
+    }
+
+    .screenshot-exit.has-share .exit-btn-download .exit-label,
+    .screenshot-exit.has-share .exit-btn-close .exit-label {
+        display: none;
+    }
 }

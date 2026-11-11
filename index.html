@@ -13,7 +13,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=1">
+    <link rel="stylesheet" href="style.css?v=2">
 
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -261,6 +261,9 @@
         <div class="modal-content">
             <button class="modal-close" onclick="closeModal('historyModal')">&times;</button>
             <h2>📜 История чеков</h2>
+            <button class="btn btn-primary" style="width: 100%; margin-top: 15px;" onclick="saveHistoryItem()">
+                <i class="fas fa-save"></i> <span id="saveHistoryLabel">Сохранить текущий чек</span>
+            </button>
             <div id="historyList" class="list-container" style="max-height: 400px; overflow-y: auto; margin-top: 15px;">
                 <!-- History items will be here -->
             </div>
@@ -301,20 +304,23 @@
         </div>
     </div>
 
-    <div class="screenshot-exit">
+    <div class="screenshot-exit" id="screenshotExit">
         <button class="btn exit-btn theme-btn-ss" onclick="toggleTheme()" id="themeToggleSS">
             <i class="fas fa-moon"></i>
         </button>
-        <button class="btn btn-primary exit-btn" onclick="downloadImage()"
+        <button class="btn btn-primary exit-btn exit-btn-download" onclick="downloadImage(event)" title="Скачать"
             style="background: var(--secondary); border: 1px solid var(--secondary);">
-            <i class="fas fa-download"></i> Скачать
+            <i class="fas fa-download"></i> <span class="exit-label">Скачать</span>
         </button>
-        <button class="btn btn-primary exit-btn" onclick="toggleScreenshotMode()">
-            <i class="fas fa-undo"></i> Выход
+        <button class="btn btn-primary exit-btn is-hidden" id="shareBtn" onclick="shareImage(event)" title="Поделиться">
+            <i class="fas fa-share-alt"></i> <span class="exit-label">Поделиться</span>
+        </button>
+        <button class="btn btn-primary exit-btn exit-btn-close" onclick="toggleScreenshotMode()" title="Выход">
+            <i class="fas fa-undo"></i> <span class="exit-label">Выход</span>
         </button>
     </div>
 
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=4"></script>
 </body>
 
 </html>

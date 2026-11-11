@@ -10,6 +10,7 @@ let totalsByParticipant = {};
 let totalBill = 0;
 let restaurantName = '';
 let checkDate = ''; // YYYY-MM-DD
+let currentHistoryId = null; // id записи в истории, из которой загружен / в которую сохранён текущий чек
 
 // --- Helpers ---
 // Экранирование пользовательского текста перед вставкой в innerHTML
@@ -47,6 +48,10 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', target);
     localStorage.setItem('foodCalc_theme', target);
     updateThemeIcon(target);
+    checkImagePromise = null; // картинка в другой теме устарела
+    if (document.body.classList.contains('screenshot-mode') && canShareFiles()) {
+        setTimeout(() => getCheckImage().catch(() => { }), 600);
+    }
 }
 
 function updateThemeIcon(theme) {
@@ -87,6 +92,7 @@ function loadFromStorage() {
     payerWallet = localStorage.getItem('gs_payerWallet') || '';
     restaurantName = localStorage.getItem('gs_restaurantName') || '';
     checkDate = localStorage.getItem('gs_checkDate') || todayLocal();
+    currentHistoryId = parseInt(localStorage.getItem('gs_currentHistoryId')) || null;
 
     // Set initial input values
     document.getElementById('commission').value = commission || '';
@@ -104,6 +110,7 @@ function saveToStorage() {
     localStorage.setItem('gs_payerWallet', payerWallet);
     localStorage.setItem('gs_restaurantName', restaurantName);
     localStorage.setItem('gs_checkDate', checkDate);
+    localStorage.setItem('gs_currentHistoryId', currentHistoryId || '');
 }
 
 // --- History Logic ---
@@ -137,9 +144,17 @@ function saveHistoryItem() {
         }
     };
 
+    // Если этот чек уже есть в истории — обновляем запись, а не создаём дубликат
+    const existing = history.findIndex(i => i.id === currentHistoryId);
+    if (existing !== -1) {
+        item.id = currentHistoryId;
+        history.splice(existing, 1);
+    }
     history.unshift(item); // Add to top
+    currentHistoryId = item.id;
     localStorage.setItem('gs_history', JSON.stringify(history));
-    pushToast('success', 'Чек сохранен в историю');
+    saveToStorage();
+    pushToast('success', existing !== -1 ? 'Чек обновлён в истории' : 'Чек сохранен в историю');
     renderHistoryList();
 }
 
@@ -151,6 +166,13 @@ function openHistory() {
 function renderHistoryList() {
     const list = document.getElementById('historyList');
     const history = getHistory();
+
+    const label = document.getElementById('saveHistoryLabel');
+    if (label) {
+        label.textContent = history.some(i => i.id === currentHistoryId)
+            ? 'Обновить чек в истории'
+            : 'Сохранить текущий чек';
+    }
 
     if (history.length === 0) {
         list.innerHTML = '<div class="empty-state"><p>История пуста</p></div>';
@@ -189,6 +211,7 @@ function loadHistoryItem(id) {
         payerWallet = d.payerWallet || '';
         restaurantName = d.restaurantName || '';
         checkDate = d.checkDate || todayLocal();
+        currentHistoryId = item.id;
 
         // Update inputs
         document.getElementById('commission').value = commission;
@@ -386,6 +409,7 @@ function renderRestaurantBadge() {
     const badge = document.getElementById('restaurantBadge');
     const display = document.getElementById('restaurantNameDisplay');
     badge.style.display = restaurantName ? 'flex' : 'none';
+    badge.classList.toggle('is-empty', !restaurantName);
     display.innerText = restaurantName ? `📍 ${restaurantName}` : '';
 }
 
@@ -527,6 +551,7 @@ function updatePayerUI() {
 
     // Show/Hide wallet
     const walletBox = document.getElementById('walletDisplayBox');
+    walletBox.classList.toggle('is-empty', !payerWallet);
     if (payerWallet) {
         walletBox.style.display = 'flex';
         document.getElementById('payerWalletDisplay').innerText = payerWallet;
@@ -672,6 +697,7 @@ function confirmClearAll() {
         payerWallet = '';
         restaurantName = ''; // Fixed: Reset restaurant name
         checkDate = todayLocal(); // Reset to today
+        currentHistoryId = null;
 
         document.getElementById('commission').value = '';
         document.getElementById('payerWallet').value = '';
@@ -711,26 +737,44 @@ function pushToast(type, message) {
 }
 
 function toggleScreenshotMode() {
-    document.body.classList.toggle('screenshot-mode');
+    const on = document.body.classList.toggle('screenshot-mode');
     window.scrollTo(0, 0);
+    checkImagePromise = null;
+    if (on) {
+        setupShareButton();
+        // Готовим картинку заранее: iPhone разрешает «Поделиться» только сразу после нажатия
+        if (canShareFiles()) setTimeout(() => getCheckImage().catch(() => { }), 600);
+    }
 }
 
-// Add Escape key listener to exit screenshot mode
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && document.body.classList.contains('screenshot-mode')) {
-        toggleScreenshotMode();
+// --- Картинка чека: скачать / поделиться ---
+let checkImagePromise = null; // кэш готовой картинки для текущего вида экрана
+
+function checkFileName() {
+    return `check_food_calc_${checkDate || todayLocal()}.png`;
+}
+
+function canShareFiles() {
+    // Только телефоны и планшеты: на компьютерах браузеры иногда заявляют поддержку,
+    // но отправка не работает, а «Скачать» там и так удобнее
+    if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return false;
+    try {
+        return !!(navigator.canShare && navigator.canShare({
+            files: [new File([''], 'check.png', { type: 'image/png' })]
+        }));
+    } catch (e) {
+        return false;
     }
-});
+}
 
-function downloadImage() {
-    const btn = event.currentTarget;
-    const originalText = btn.innerHTML;
+function setupShareButton() {
+    const supported = canShareFiles();
+    document.getElementById('shareBtn').classList.toggle('is-hidden', !supported);
+    document.getElementById('screenshotExit').classList.toggle('has-share', supported);
+}
 
-    // Show loading state on button
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    btn.style.opacity = '0.8';
-
-    html2canvas(document.body, {
+function renderCheckCanvas() {
+    return html2canvas(document.body, {
         backgroundColor: getComputedStyle(document.body).backgroundColor,
         scale: 2, // Better quality
         onclone: (clonedDoc) => {
@@ -741,22 +785,88 @@ function downloadImage() {
                 exitControls.style.setProperty('display', 'none', 'important');
             }
         }
-    }).then(canvas => {
-        // Restore button state
-        btn.innerHTML = originalText;
+    });
+}
+
+// Возвращает Promise<File> с картинкой чека (из кэша, если уже готова)
+function getCheckImage() {
+    if (!checkImagePromise) {
+        checkImagePromise = renderCheckCanvas()
+            .then(canvas => new Promise((resolve, reject) =>
+                canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png')))
+            .then(blob => new File([blob], checkFileName(), { type: 'image/png' }))
+            .catch(err => {
+                checkImagePromise = null;
+                throw err;
+            });
+    }
+    return checkImagePromise;
+}
+
+function setBusy(btn, busy) {
+    if (busy) {
+        btn.dataset.html = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.style.opacity = '0.8';
+    } else if (btn.dataset.html) {
+        btn.innerHTML = btn.dataset.html;
         btn.style.opacity = '1';
+    }
+}
 
-        // Download
-        const link = document.createElement('a');
-        link.download = `check_food_calc_${checkDate || todayLocal()}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
+function shareImage(e) {
+    const btn = e.currentTarget;
+    setBusy(btn, true);
+    getCheckImage().then(file => {
+        setBusy(btn, false);
+        const title = restaurantName ? `Чек — ${restaurantName}` : 'Чек';
+        return navigator.share({ files: [file], title }).catch(err => {
+            if (err.name === 'AbortError') return; // пользователь закрыл меню
+            if (err.name === 'NotAllowedError') {
+                // Картинка готовилась слишком долго — теперь она в кэше, второе нажатие сработает сразу
+                pushToast('success', 'Картинка готова — нажмите «Поделиться» ещё раз');
+                return;
+            }
+            // Поделиться не вышло — просто скачиваем картинку
+            console.error(err);
+            saveFile(file);
+            pushToast('success', 'Поделиться не получилось — картинка скачана');
+        });
+    }).catch(err => {
+        console.error(err);
+        setBusy(btn, false);
+        pushToast('error', 'Ошибка при создании картинки');
+    });
+}
 
+function saveFile(file) {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.download = file.name;
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+// Add Escape key listener to exit screenshot mode
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('screenshot-mode')) {
+        toggleScreenshotMode();
+    }
+});
+
+function downloadImage(e) {
+    const btn = e.currentTarget;
+    setBusy(btn, true);
+    getCheckImage().then(file => {
+        setBusy(btn, false);
+        saveFile(file);
         pushToast('success', 'Чек сохранен!');
     }).catch(err => {
         console.error(err);
-        btn.innerHTML = originalText;
-        btn.style.opacity = '1';
+        setBusy(btn, false);
         pushToast('error', 'Ошибка при создании картинки');
     });
 }
