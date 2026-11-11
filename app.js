@@ -309,6 +309,31 @@ function calculateTotals() {
         const subtotalShared = sharedDishes.reduce((acc, d) => acc + (d.sharedDishCost * d.sharedDishQuantity), 0);
         totalBill = subtotalShared + (subtotalShared * (commission / 100));
     }
+
+    roundTotals();
+}
+
+// Округление до дирамов так, чтобы суммы сходились:
+// общий счёт округляется один раз, а недостающие дирамы раздаются
+// участникам с наибольшими отброшенными остатками (метод наибольшего остатка).
+// Тогда сумма долгов всегда равна «К возврату», а сумма всех — общему счёту.
+function roundTotals() {
+    const totalCents = Math.round(totalBill * 100 + 1e-6);
+    totalBill = totalCents / 100;
+
+    const names = Object.keys(totalsByParticipant);
+    if (names.length === 0) return;
+
+    const parts = names.map(name => {
+        const exact = totalsByParticipant[name] * 100;
+        const floor = Math.floor(exact + 1e-6);
+        return { name, cents: floor, rest: exact - floor };
+    });
+    let left = totalCents - parts.reduce((acc, p) => acc + p.cents, 0);
+    parts.slice().sort((a, b) => b.rest - a.rest).forEach(p => {
+        if (left > 0) { p.cents++; left--; }
+    });
+    parts.forEach(p => { totalsByParticipant[p.name] = p.cents / 100; });
 }
 
 function updateUI() {
@@ -510,7 +535,7 @@ function updatePayerUI() {
     }
 
     const payerDue = totalsByParticipant[payer] || 0;
-    const reimbursement = totalBill - payerDue;
+    const reimbursement = Math.round((totalBill - payerDue) * 100) / 100;
     const reimEl = document.getElementById('payerReimbursement');
     if (reimEl) reimEl.innerText = `${reimbursement.toFixed(2)} SM`;
 
