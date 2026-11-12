@@ -536,7 +536,7 @@ function summaryRows(name, personalSubtotal) {
         html += shares.map(x => row('└ ' + esc(x.label), money(x.cents), true)).join('');
     }
     if (commission) html += row(`Сервис ${commission}%:`, money(serviceCents));
-    if (roundCents > 0) html += row('Округление (остаток дирамов):', '+' + money(roundCents));
+    if (roundCents > 0) html += row('Копейки от округления за всех:', '+' + money(roundCents));
     return html;
 }
 
