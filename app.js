@@ -81,6 +81,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // --- Initialization ---
 window.onload = function () {
     loadFromStorage();
+    initWallets();
     updateUI();
 };
 
@@ -600,16 +601,110 @@ function updatePayerSelect() {
     select.value = current || "";
 }
 
+// --- Реквизиты запоминаются за человеком ---
+const WALLETS_KEY = 'gs_wallets';
+
+function getWallets() {
+    try { return JSON.parse(localStorage.getItem(WALLETS_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+
+function saveWallets(w) {
+    try { localStorage.setItem(WALLETS_KEY, JSON.stringify(w)); } catch (e) { /* без хранилища не запомнится */ }
+}
+
+// Первый запуск: собрать номера плательщиков из истории чеков
+function initWallets() {
+    let has = false;
+    try { has = localStorage.getItem(WALLETS_KEY) != null; } catch (e) { /* ок */ }
+    if (has) return;
+    const w = {};
+    getHistory().slice().reverse().forEach(h => {
+        const d = h.data || {};
+        if (d.payer && d.payerWallet) w[d.payer] = d.payerWallet;
+    });
+    if (payer && payerWallet) w[payer] = payerWallet;
+    saveWallets(w);
+}
+
 function updatePayer() {
     payer = document.getElementById('payerSelect').value || null;
+    const w = getWallets();
+    if (payer && w[payer]) {
+        // У этого человека номер уже известен — подставляем
+        if (payerWallet !== w[payer]) pushToast('success', `Номер ${payer} подставлен`);
+        payerWallet = w[payer];
+    } else if (payerWallet && Object.values(w).includes(payerWallet)) {
+        // В поле номер другого человека — убираем, чтобы не перевели не туда
+        payerWallet = '';
+    } else if (payer && payerWallet.trim()) {
+        // Номер вписали до выбора плательщика — запоминаем за ним
+        w[payer] = payerWallet.trim();
+        saveWallets(w);
+    }
+    document.getElementById('payerWallet').value = payerWallet;
     updateUI();
 }
 
 document.getElementById('payerWallet').addEventListener('input', (e) => {
     payerWallet = e.target.value;
+    if (payer) {
+        const w = getWallets();
+        if (payerWallet.trim()) w[payer] = payerWallet.trim();
+        else delete w[payer];
+        saveWallets(w);
+    }
     saveToStorage();
     updatePayerUI();
 });
+
+// --- Расчёт текстом для группы ---
+function buildCheckText() {
+    const names = Object.keys(participants);
+    const money = v => (Math.round(v * 100) / 100).toFixed(2);
+    const lines = [];
+    const [y, m, d] = (checkDate || todayLocal()).split('-');
+    const date = new Date(y, m - 1, d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).replace(/\s*г\.$/, '');
+    lines.push('🧾 ' + (restaurantName ? restaurantName + ' · ' : '') + date);
+    lines.push(`Общий счёт: ${money(totalBill)} SM` + (commission ? ` (с сервисом ${commission}%)` : ''));
+    lines.push('');
+    if (payer) {
+        lines.push(`💳 Переводить ${payer}` + (payerWallet.trim() ? `: ${formatWallet(payerWallet)}` : ''));
+        lines.push('');
+        const others = names.filter(n => n !== payer);
+        if (others.length) {
+            lines.push('К оплате:');
+            others.forEach(n => lines.push(`• ${n} — ${money(totalsByParticipant[n])} SM`));
+        }
+    } else {
+        lines.push('Каждый платит:');
+        names.forEach(n => lines.push(`• ${n} — ${money(totalsByParticipant[n])} SM`));
+    }
+    return lines.join('\n');
+}
+
+function copyCheckText() {
+    if (Object.keys(participants).length === 0) {
+        pushToast('error', 'Пока нечего копировать — добавьте участников');
+        return;
+    }
+    const text = buildCheckText();
+    const done = () => pushToast('success', 'Расчёт скопирован — вставьте в чат');
+    const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { pushToast('error', 'Не удалось скопировать'); }
+        ta.remove();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, fallback);
+    } else {
+        fallback();
+    }
+}
 
 function updatePayerUI() {
     const box = document.getElementById('payerInfoBox');
