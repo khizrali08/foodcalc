@@ -13,7 +13,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
 
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -139,12 +139,6 @@
                             id="payerNameDisplay">—</span>
                     </div>
 
-                    <div id="walletDisplayBox"
-                        style="font-size: 0.85rem; color: var(--text-muted); background: var(--bg-item); padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border); font-family: monospace; display: flex; align-items: center;">
-                        <i class="fas fa-wallet" style="font-size: 0.75rem; margin-right: 6px; opacity: 0.7;"></i>
-                        <span id="payerWalletDisplay" class="ym-hide-content">не указан</span>
-                    </div>
-
                     <div id="payerReimbursementBadge" class="reimbursement-badge"
                         style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 4px 10px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.2);">
                         К возврату: <span id="payerReimbursement">0.00</span>
@@ -169,6 +163,11 @@
                         <div class="value" id="screenshotTotalAmount">0.00 SM</div>
                     </div>
                 </div>
+            </div>
+            <!-- Куда переводить: крупно, чтобы номер читался даже на маленьком скриншоте -->
+            <div id="payToBox" class="pay-to hidden">
+                <div class="pay-to-label"><i class="fas fa-wallet"></i> Переводить <b id="payToName"></b> на номер:</div>
+                <div class="pay-to-number ym-hide-content" id="payToNumber"></div>
             </div>
             <div id="debtsContainer" style="margin-top: 2px;"></div>
         </div>
@@ -359,7 +358,7 @@
         </button>
     </div>
 
-    <script src="app.js?v=7"></script>
+    <script src="app.js?v=8"></script>
     <script src="receipt-parse.js?v=1"></script>
     <script src="receipt.js?v=5"></script>
 </body>

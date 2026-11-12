@@ -591,14 +591,12 @@ function updatePayerUI() {
     box.classList.remove('hidden');
     document.getElementById('payerNameDisplay').innerText = payer;
 
-    // Show/Hide wallet
-    const walletBox = document.getElementById('walletDisplayBox');
-    walletBox.classList.toggle('is-empty', !payerWallet);
+    // Куда переводить — крупная плашка с номером
+    const payTo = document.getElementById('payToBox');
+    payTo.classList.toggle('hidden', !payerWallet);
     if (payerWallet) {
-        walletBox.style.display = 'flex';
-        document.getElementById('payerWalletDisplay').innerText = payerWallet;
-    } else {
-        walletBox.style.display = 'none';
+        document.getElementById('payToName').innerText = payer;
+        document.getElementById('payToNumber').innerText = formatWallet(payerWallet);
     }
 
     const payerDue = totalsByParticipant[payer] || 0;
@@ -820,6 +818,11 @@ function renderCheckCanvas() {
         backgroundColor: getComputedStyle(document.body).backgroundColor,
         scale: 2, // Better quality
         onclone: (clonedDoc) => {
+            // В копии страницы анимации появления запускаются заново, и картинка
+            // захватывает элементы полупрозрачными — отключаем анимации
+            const st = clonedDoc.createElement('style');
+            st.textContent = '*, *::before, *::after { animation: none !important; transition: none !important; }';
+            clonedDoc.head.appendChild(st);
             // Hide controls ONLY in the screenshot, not in the real DOM
             const exitControls = clonedDoc.querySelector('.screenshot-exit');
             if (exitControls) {
@@ -911,6 +914,20 @@ function downloadImage(e) {
         setBusy(btn, false);
         pushToast('error', 'Ошибка при создании картинки');
     });
+}
+
+// Номер с разбивкой на группы, чтобы его было легко прочитать и переписать:
+// карта 4444 1234 5678 9012, телефон 985 19 05 90, +992 985 19 05 90
+function formatWallet(v) {
+    const raw = String(v || '').trim();
+    const digits = raw.replace(/[\s\-()]/g, '');
+    if (!/^\+?\d{6,}$/.test(digits)) return raw; // не только цифры — показываем как есть
+    const plus = digits.startsWith('+') ? '+' : '';
+    let d = digits.replace('+', '');
+    const phone = n => n.replace(/^(\d{3})(\d{2})(\d{2})(\d{2})$/, '$1 $2 $3 $4');
+    if (d.length === 9) return plus + phone(d);
+    if (d.length === 12 && d.startsWith('992')) return '+992 ' + phone(d.slice(3));
+    return plus + d.replace(/(\d{4})(?=\d)/g, '$1 ');
 }
 
 function copyWallet() {

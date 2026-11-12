@@ -1671,3 +1671,49 @@ body.screenshot-mode .screenshot-exit {
     color: var(--secondary);
     border-color: var(--secondary);
 }
+
+/* ===== Куда переводить ===== */
+.pay-to {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 4px 0 10px;
+    padding: 10px 16px;
+    border: 2px solid var(--primary);
+    border-radius: 14px;
+    background: var(--primary-light);
+}
+
+.pay-to-label {
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+.pay-to-label i {
+    color: var(--primary);
+    margin-right: 4px;
+}
+
+.pay-to-number {
+    font-size: 1.75rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.15;
+    color: var(--primary);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+body.screenshot-mode .pay-to-number {
+    font-size: 2rem;
+}
+
+@media (max-width: 480px) {
+    .pay-to-number {
+        font-size: 1.5rem;
+    }
+
+    body.screenshot-mode .pay-to-number {
+        font-size: 1.7rem;
+    }
+}
