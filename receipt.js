@@ -510,7 +510,7 @@ async function receiptFromPhoto(input) {
         if (rcGeminiKey()) {
             try {
                 rcProgress('Распознаю с помощью Gemini…', null);
-                rcGeminiStageHook = st => rcProgress(/список/.test(st) ? 'Связываюсь с Gemini…' : 'Распознаю с помощью Gemini (до минуты)…', null);
+                rcGeminiStageHook = st => rcProgress(/список/.test(st) ? 'Связываюсь с Gemini…' : 'Распознаю с помощью Gemini: ' + st.replace(/^модель /, '') + '…', null);
                 try {
                     parsed = await rcGemini(canvas);
                 } finally {
@@ -729,55 +729,78 @@ async function rcFetchGemini(stage, url, opts, timeoutMs) {
     }
 }
 
-// Выбрать модель: самая новая Flash; если таких нет — любая подходящая Gemini
-async function rcGeminiModel(key, fresh) {
-    if (!fresh) {
-        try {
-            const saved = localStorage.getItem(RC_GEMINI_MODEL);
-            if (saved) return saved;
-        } catch (e) { /* нет хранилища */ }
-    }
+// Список моделей-кандидатов по порядку. Бесплатные модели Gemini часто перегружены (503),
+// «молчат» или уже недоступны новым пользователям (404), поэтому пробуем несколько по очереди.
+async function rcGeminiCandidates(key) {
     const data = await rcFetchGemini('список моделей', 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', {
         headers: { 'x-goog-api-key': key }
     });
     const all = (data.models || [])
         .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
         .map(m => m.name.replace(/^models\//, ''))
-        .filter(n => /^gemini-/.test(n) && !/(embed|tts|image|live|audio|aqa|vision|robotics|computer|thinking-exp)/.test(n));
+        .filter(n => /^gemini-/.test(n) && /flash/.test(n) &&
+            !/(embed|tts|image|live|audio|aqa|robotics|computer|thinking-exp|omni|8b)/.test(n));
+    if (!all.length) throw rcGeminiError('список моделей', 404, 'нет моделей Gemini Flash для generateContent');
     const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [0, 0])[1]);
-    const rank = n => (/flash/.test(n) ? 0 : 2) + (/lite|8b/.test(n) ? 1 : 0) + (/preview|exp/.test(n) ? 0.5 : 0);
-    if (!all.length) throw rcGeminiError('список моделей', 404, 'нет моделей Gemini для generateContent');
-    let model;
-    if (all.includes('gemini-flash-latest')) model = 'gemini-flash-latest';
-    else model = all.slice().sort((a, b) => rank(a) - rank(b) || ver(b) - ver(a) || a.length - b.length)[0];
-    try { localStorage.setItem(RC_GEMINI_MODEL, model); } catch (e) { /* ок */ }
-    return model;
+    const versions = all.filter(n => !/latest/.test(n))
+        .sort((a, b) => ver(b) - ver(a) || (/lite/.test(a) ? 1 : 0) - (/lite/.test(b) ? 1 : 0) || (/preview/.test(a) ? 1 : 0) - (/preview/.test(b) ? 1 : 0));
+    const order = [];
+    const push = n => { if (n && all.includes(n) && !order.includes(n)) order.push(n); };
+    try { push(localStorage.getItem(RC_GEMINI_MODEL)); } catch (e) { /* ок */ } // та, что сработала в прошлый раз
+    push('gemini-flash-latest');
+    push('gemini-flash-lite-latest');
+    // Чередуем полные и облегчённые версии: у них разная загрузка
+    const full = versions.filter(n => !/lite/.test(n)), lite = versions.filter(n => /lite/.test(n));
+    for (let i = 0; i < Math.max(full.length, lite.length); i++) { push(full[i]); push(lite[i]); }
+    return order.slice(0, 7);
 }
 
-// Запрос к модели с повтором: другая модель при 404, пауза при перегрузке,
-// без схемы ответа, если модель её не принимает
+// Ошибки, после которых имеет смысл попробовать другую модель
+const rcTryNextModel = e => e.status === 'timeout' || e.status === 404 || e.status === 429 || e.status >= 500;
+
 async function rcGeminiGenerate(key, parts, useSchema) {
-    let model = await rcGeminiModel(key);
-    let schema = useSchema;
-    for (let attempt = 0; attempt < 3; attempt++) {
-        const generationConfig = { temperature: 0, responseMimeType: 'application/json' };
-        if (schema) generationConfig.responseSchema = RC_GEMINI_SCHEMA;
-        try {
-            return await rcFetchGemini((parts.length > 1 ? 'распознавание, ' : 'тестовый запрос, ') + model,
-                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-                body: JSON.stringify({ contents: [{ parts }], generationConfig })
-            }, parts.length > 1 ? 60000 : 30000);
-        } catch (e) {
-            if (attempt === 2) throw e;
-            if (e.status === 404) { model = await rcGeminiModel(key, true); continue; }
-            if (e.status === 400 && schema && /schema|response_?mime|json mode/i.test(e.detail)) { schema = false; continue; }
-            if (e.status === 'timeout') throw e; // сеть «висит» — повторять бессмысленно
-            if (e.status >= 500) { await new Promise(r => setTimeout(r, 1500)); continue; }
-            throw e;
+    const isPhoto = parts.length > 1;
+    const deadline = Date.now() + (isPhoto ? 100000 : 50000);
+    const models = await rcGeminiCandidates(key);
+    const tried = [];
+    const statuses = [];
+    let lastErr = null;
+    for (let i = 0; i < models.length; i++) {
+        const model = models[i];
+        let schema = useSchema;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const left = deadline - Date.now();
+            if (left < 3000) break;
+            const generationConfig = { temperature: 0, responseMimeType: 'application/json' };
+            if (schema) generationConfig.responseSchema = RC_GEMINI_SCHEMA;
+            try {
+                const data = await rcFetchGemini(`модель ${model} (${i + 1} из ${models.length})`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+                    body: JSON.stringify({ contents: [{ parts }], generationConfig })
+                }, Math.min(isPhoto ? 35000 : 15000, left));
+                try { localStorage.setItem(RC_GEMINI_MODEL, model); } catch (e) { /* ок */ }
+                data.__model = model;
+                return data;
+            } catch (e) {
+                lastErr = e;
+                // Модель не принимает схему ответа — тот же запрос без схемы
+                if (e.status === 400 && schema && /schema|response_?mime|json mode/i.test(e.detail)) { schema = false; continue; }
+                if (!rcTryNextModel(e)) throw e; // ключ, регион, ограничения — другая модель не поможет
+                tried.push(`${model}: ${e.status === 'timeout' ? 'молчит' : e.status}`);
+                statuses.push(e.status);
+                try { if (localStorage.getItem(RC_GEMINI_MODEL) === model) localStorage.removeItem(RC_GEMINI_MODEL); } catch (x) { /* ок */ }
+                break;
+            }
         }
+        if (deadline - Date.now() < 3000) break;
     }
+    const e = rcGeminiError('все модели', lastErr ? lastErr.status : 503, 'перепробованы: ' + tried.join('; '));
+    e.userMessage = statuses.length && statuses.every(st => st === 429)
+        ? 'Лимит бесплатных запросов Gemini исчерпан — попробуйте позже (обычно лимит обновляется в течение суток)'
+        : 'Все модели Gemini сейчас перегружены или не отвечают — так бывает на бесплатном ключе. Попробуйте через пару минут';
+    throw e;
 }
 
 // Кнопка «Проверить ключ»: список моделей + крошечный запрос
@@ -789,16 +812,15 @@ async function rcTestGemini() {
     const started = Date.now();
     let stage = 'связь с Google';
     const show = () => {
-        const step = /тестовый/.test(stage) ? 'шаг 2 из 2: ' : 'шаг 1 из 2: ';
+        const step = /модель/.test(stage) ? 'шаг 2 из 2: ' : 'шаг 1 из 2: ';
         el.innerHTML = `<div class="rc-ai-result">Проверяю… ${step}${esc(stage.replace('список моделей', 'связь с Google'))} (${Math.round((Date.now() - started) / 1000)} с)</div>`;
     };
     rcGeminiStageHook = st => { stage = st; show(); };
     const tick = setInterval(show, 1000);
     show();
     try {
-        try { localStorage.removeItem(RC_GEMINI_MODEL); } catch (e) { /* ок */ }
         const data = await rcGeminiGenerate(key, [{ text: 'Ответь JSON: {"items": []}' }], false);
-        const model = localStorage.getItem(RC_GEMINI_MODEL) || '';
+        const model = data.__model || '';
         const ok = !!((data.candidates || [])[0]);
         if (!ok) throw rcGeminiError('проверка', 200, JSON.stringify(data.promptFeedback || data).slice(0, 300));
         try { localStorage.removeItem(RC_GEMINI_ERR); } catch (e) { /* ок */ }
