@@ -510,7 +510,12 @@ async function receiptFromPhoto(input) {
         if (rcGeminiKey()) {
             try {
                 rcProgress('Распознаю с помощью Gemini…', null);
-                parsed = await rcGemini(canvas);
+                rcGeminiStageHook = st => rcProgress(/список/.test(st) ? 'Связываюсь с Gemini…' : 'Распознаю с помощью Gemini (до минуты)…', null);
+                try {
+                    parsed = await rcGemini(canvas);
+                } finally {
+                    rcGeminiStageHook = null;
+                }
                 source = 'Gemini';
             } catch (e) {
                 console.error(e);
@@ -636,6 +641,7 @@ const RC_GEMINI_ERR = 'gs_geminiLastError';
 
 function rcExplainGemini(status, msg) {
     const m = String(msg || '').toLowerCase();
+    if (status === 'timeout') return 'Google не ответил вовремя: связь с его сервером очень медленная или блокируется в вашей сети. Попробуйте другой интернет (Wi-Fi ↔ мобильный) или VPN';
     if (status === 0) return 'Нет связи с сервером Google. Возможно, он недоступен из вашей сети — попробуйте другой интернет (Wi-Fi/мобильный) или VPN';
     if (/api_key_invalid|api key not valid|api key expired|invalid api key/.test(m)) return 'Ключ неверный или устарел — скопируйте его заново из AI Studio';
     if (/location is not supported|user location/.test(m)) return 'Google не разрешает Gemini API из вашей страны или сети. Работает через VPN';
@@ -696,15 +702,31 @@ function rcAiErrorHtml(title, err) {
     </div>`;
 }
 
-async function rcFetchGemini(stage, url, opts) {
+// Кто показывает, на каком шаге ждём ответа Google (кнопка «Проверить» / прогресс фото)
+let rcGeminiStageHook = null;
+
+// Запрос к Google с ограничением по времени: если соединение «висит» (медленная или
+// блокируемая сеть), через timeoutMs будет понятная ошибка, а не бесконечное ожидание
+async function rcFetchGemini(stage, url, opts, timeoutMs) {
+    timeoutMs = timeoutMs || 20000;
+    if (rcGeminiStageHook) rcGeminiStageHook(stage);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     let res;
     try {
-        res = await fetch(url, opts);
+        res = await fetch(url, Object.assign({}, opts, { signal: ctrl.signal }));
+        if (!res.ok) throw rcGeminiError(stage, res.status, await res.text());
+        return await res.json();
     } catch (e) {
+        if (e.userMessage) throw e;
+        if (ctrl.signal.aborted) {
+            const err = rcGeminiError(stage, 'timeout', `нет ответа за ${Math.round(timeoutMs / 1000)} с`);
+            throw err;
+        }
         throw rcGeminiError(stage, 0, String(e && e.message || e));
+    } finally {
+        clearTimeout(timer);
     }
-    if (!res.ok) throw rcGeminiError(stage, res.status, await res.text());
-    return res.json();
 }
 
 // Выбрать модель: самая новая Flash; если таких нет — любая подходящая Gemini
@@ -741,16 +763,17 @@ async function rcGeminiGenerate(key, parts, useSchema) {
         const generationConfig = { temperature: 0, responseMimeType: 'application/json' };
         if (schema) generationConfig.responseSchema = RC_GEMINI_SCHEMA;
         try {
-            return await rcFetchGemini('распознавание, ' + model,
+            return await rcFetchGemini((parts.length > 1 ? 'распознавание, ' : 'тестовый запрос, ') + model,
                 `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
                 body: JSON.stringify({ contents: [{ parts }], generationConfig })
-            });
+            }, parts.length > 1 ? 60000 : 30000);
         } catch (e) {
             if (attempt === 2) throw e;
             if (e.status === 404) { model = await rcGeminiModel(key, true); continue; }
             if (e.status === 400 && schema && /schema|response_?mime|json mode/i.test(e.detail)) { schema = false; continue; }
+            if (e.status === 'timeout') throw e; // сеть «висит» — повторять бессмысленно
             if (e.status >= 500) { await new Promise(r => setTimeout(r, 1500)); continue; }
             throw e;
         }
@@ -763,7 +786,15 @@ async function rcTestGemini() {
     const key = (document.getElementById('rcGeminiKeyInput').value || '').trim() || rcGeminiKey();
     if (!key) { pushToast('error', 'Вставьте ключ'); return; }
     el.dataset.test = '1';
-    el.innerHTML = '<div class="rc-ai-result">Проверяю…</div>';
+    const started = Date.now();
+    let stage = 'связь с Google';
+    const show = () => {
+        const step = /тестовый/.test(stage) ? 'шаг 2 из 2: ' : 'шаг 1 из 2: ';
+        el.innerHTML = `<div class="rc-ai-result">Проверяю… ${step}${esc(stage.replace('список моделей', 'связь с Google'))} (${Math.round((Date.now() - started) / 1000)} с)</div>`;
+    };
+    rcGeminiStageHook = st => { stage = st; show(); };
+    const tick = setInterval(show, 1000);
+    show();
     try {
         try { localStorage.removeItem(RC_GEMINI_MODEL); } catch (e) { /* ок */ }
         const data = await rcGeminiGenerate(key, [{ text: 'Ответь JSON: {"items": []}' }], false);
@@ -777,6 +808,8 @@ async function rcTestGemini() {
         rcRememberGeminiError(e);
         el.innerHTML = rcAiErrorHtml('Ключ не работает', { msg: e.userMessage || String(e.message), stage: e.stage, status: e.status ?? '', detail: e.detail || String(e.message) });
     } finally {
+        clearInterval(tick);
+        rcGeminiStageHook = null;
         delete el.dataset.test;
         rcRenderAiStatusOnly();
     }
