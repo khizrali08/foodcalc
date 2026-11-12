@@ -7,6 +7,7 @@ let payer = null;
 let payerWallet = '';
 
 let totalsByParticipant = {};
+let totalsExact = {}; // доли до округления до дирамов
 let totalBill = 0;
 let restaurantName = '';
 let checkDate = ''; // YYYY-MM-DD
@@ -267,14 +268,36 @@ function addDish() {
 function openSharedModal() {
     const container = document.getElementById('sharedParticipantsCheckboxes');
     const pNames = Object.keys(participants);
-    if (pNames.length === 0) {
-        container.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted);">Сначала добавьте участников</p>';
-    } else {
-        container.innerHTML = pNames.map(n =>
-            '<label><input type="checkbox" value="' + esc(n) + '" checked> ' + esc(n) + '</label>'
-        ).join('');
-    }
+    container.innerHTML = pNames.map(n =>
+        '<label><input type="checkbox" value="' + esc(n) + '" checked> ' + esc(n) + '</label>'
+    ).join('');
+    document.getElementById('sharedNewPerson').value = '';
     openModal('sharedModal');
+}
+
+// Человек, который не заказывал себе, а ел только общее: добавляется прямо здесь.
+// В расчёт он попадёт при «Добавить общее блюдо»
+function sharedAddPerson() {
+    const input = document.getElementById('sharedNewPerson');
+    const name = input.value.trim();
+    if (!name) return;
+    const container = document.getElementById('sharedParticipantsCheckboxes');
+    const existing = [...container.querySelectorAll('input[type="checkbox"]')].find(cb => cb.value === name);
+    if (existing) {
+        existing.checked = true;
+    } else {
+        container.insertAdjacentHTML('beforeend',
+            '<label><input type="checkbox" value="' + esc(name) + '" checked> ' + esc(name) + '</label>');
+    }
+    input.value = '';
+    input.focus();
+}
+
+function sharedNewPersonKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        sharedAddPerson();
+    }
 }
 
 function addSharedDish() {
@@ -287,12 +310,19 @@ function addSharedDish() {
         return;
     }
 
-    const checked = document.querySelectorAll('#sharedParticipantsCheckboxes input[type="checkbox"]:checked');
+    let checked = document.querySelectorAll('#sharedParticipantsCheckboxes input[type="checkbox"]:checked');
+    // Имя, вписанное в поле, но без Enter, — тоже добавить
+    if (document.getElementById('sharedNewPerson').value.trim()) {
+        sharedAddPerson();
+        checked = document.querySelectorAll('#sharedParticipantsCheckboxes input[type="checkbox"]:checked');
+    }
     const selectedParticipants = Array.from(checked).map(cb => cb.value);
     if (Object.keys(participants).length > 0 && selectedParticipants.length === 0) {
         pushToast('error', 'Отметьте хотя бы одного участника');
         return;
     }
+    // Новые люди (только общее) — в участники, без своих блюд
+    selectedParticipants.forEach(n => { if (!participants[n]) participants[n] = []; });
     sharedDishes.push({ sharedDishName: dish, sharedDishCost: cost, sharedDishQuantity: qty, participants: selectedParticipants });
     dishPrices[dish] = cost;
 
@@ -311,6 +341,7 @@ function calculateTotals() {
     const participantCount = pNames.length;
     totalBill = 0;
     totalsByParticipant = {};
+    totalsExact = {};
 
     pNames.forEach(name => {
         const personal = participants[name].reduce((acc, d) => acc + (d.dishCost * d.dishQuantity), 0);
@@ -325,6 +356,7 @@ function calculateTotals() {
         const sharedCommission = sharedForPerson * (commission / 100);
         const final = personal + personalCommission + sharedForPerson + sharedCommission;
         totalsByParticipant[name] = final;
+        totalsExact[name] = final;
         totalBill += final;
     });
 
@@ -337,8 +369,8 @@ function calculateTotals() {
 }
 
 // Округление до дирамов так, чтобы суммы сходились:
-// общий счёт округляется один раз, а недостающие дирамы раздаются
-// участникам с наибольшими отброшенными остатками (метод наибольшего остатка).
+// общий счёт округляется один раз, а недостающие дирамы получает плательщик
+// (если он не выбран — участники с наибольшими отброшенными остатками).
 // Тогда сумма долгов всегда равна «К возврату», а сумма всех — общему счёту.
 function roundTotals() {
     const totalCents = Math.round(totalBill * 100 + 1e-6);
@@ -353,6 +385,13 @@ function roundTotals() {
         return { name, cents: floor, rest: exact - floor };
     });
     let left = totalCents - parts.reduce((acc, p) => acc + p.cents, 0);
+    // Лишние дирамы от округления — плательщику: он и так платит за всех,
+    // а у остальных одинаковые заказы стоят одинаково
+    const payerPart = parts.find(p => p.name === payer);
+    if (payerPart && left > 0) {
+        payerPart.cents += left;
+        left = 0;
+    }
     parts.slice().sort((a, b) => b.rest - a.rest).forEach(p => {
         if (left > 0) { p.cents++; left--; }
     });
@@ -472,6 +511,7 @@ function renderParticipantsList() {
                     <button class="icon-btn delete" onclick="deleteParticipant(${jsArg(name)})"><i class="fas fa-user-minus"></i></button>
                 </div>
                 <div class="dish-list">
+                    ${dishes.length === 0 ? '<div class="dish-item" style="color: var(--text-muted); font-style: italic;">Только общие блюда</div>' : ''}
                     ${dishes.map((d, idx) => `
                         <div class="dish-item">
                             <span>${d.dishQuantity}х ${esc(d.dishName)} — ${(d.dishCost * d.dishQuantity).toFixed(2)} SM</span>
@@ -483,19 +523,51 @@ function renderParticipantsList() {
                     `).join('')}
                 </div>
                 <div class="summary-badge">
-                    <div class="summary-row"><span>Промежуточный итог:</span><span>${personalSubtotal.toFixed(2)} SM</span></div>
-                    <div class="summary-row"><span>Доля общих + комиссия:</span><span>${(totalsByParticipant[name] - personalSubtotal * (1 + commission / 100)).toFixed(2)} SM</span></div>
-                    ${sharedDishes.map(d => {
-                        const dp = sharedParticipantsOf(d, Object.keys(participants));
-                        if (!dp.includes(name)) return '';
-                        const share = (d.sharedDishCost * d.sharedDishQuantity) / dp.length * (1 + commission / 100);
-                        return '<div class="summary-row" style="padding-left:10px;font-size:0.8rem;opacity:0.75;"><span>└ ' + esc(d.sharedDishName) + ' (1/' + dp.length + ')</span><span>' + share.toFixed(2) + ' SM</span></div>';
-                    }).join('')}
+                    ${summaryRows(name, personalSubtotal)}
                     <div class="summary-total"><span>Итого к оплате:</span><span>${totalsByParticipant[name].toFixed(2)} SM</span></div>
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// Строки карточки участника, которые в сумме дают ровно «Итого к оплате»:
+// свои блюда + общие блюда (доли) + сервис + округление (если есть)
+function summaryRows(name, personalSubtotal) {
+    const c = v => Math.round(v * 100);
+    const money = cents => (cents / 100).toFixed(2) + ' SM';
+    const pNames = Object.keys(participants);
+
+    const shares = [];
+    sharedDishes.forEach(d => {
+        const dp = sharedParticipantsOf(d, pNames);
+        if (!dp.includes(name)) return;
+        const exact = (d.sharedDishCost * d.sharedDishQuantity) / dp.length;
+        shares.push({ label: d.sharedDishName + ' (1/' + dp.length + ')', exact, cents: c(exact) });
+    });
+    const personalCents = c(personalSubtotal);
+    let sharedCents = shares.reduce((a, x) => a + x.cents, 0);
+    const totalCents = c(totalsByParticipant[name]);
+    // «Округление» показываем только у плательщика — это лишние дирамы, которые ему достались.
+    // Расхождение в 1 дирам от округления отдельных строк остаётся в строке сервиса.
+    const exactCents = Math.floor((totalsExact[name] ?? totalsByParticipant[name]) * 100 + 1e-6);
+    const roundCents = name === payer ? Math.max(0, totalCents - exactCents) : 0;
+    let serviceCents = totalCents - roundCents - personalCents - sharedCents;
+    if (!commission && serviceCents !== 0) { // без сервиса расхождение (≤1 дирам) — в общие блюда
+        sharedCents += serviceCents;
+        if (shares.length) shares[shares.length - 1].cents += serviceCents;
+        serviceCents = 0;
+    }
+
+    const row = (label, value, sub) => `<div class="summary-row"${sub ? ' style="padding-left:10px;font-size:0.8rem;opacity:0.75;"' : ''}><span>${label}</span><span>${value}</span></div>`;
+    let html = personalCents || !shares.length ? row('Свои блюда:', money(personalCents)) : '';
+    if (shares.length) {
+        html += row('Общие блюда:', money(sharedCents));
+        html += shares.map(x => row('└ ' + esc(x.label), money(x.cents), true)).join('');
+    }
+    if (commission) html += row(`Сервис ${commission}%:`, money(serviceCents));
+    if (roundCents > 0) html += row('Копейки от округления за всех:', '+' + money(roundCents));
+    return html;
 }
 
 function updateDatalists() {
@@ -549,14 +621,14 @@ function updatePayerUI() {
     box.classList.remove('hidden');
     document.getElementById('payerNameDisplay').innerText = payer;
 
-    // Show/Hide wallet
-    const walletBox = document.getElementById('walletDisplayBox');
-    walletBox.classList.toggle('is-empty', !payerWallet);
+    // Куда переводить — крупная плашка с номером
+    const payTo = document.getElementById('payToBox');
+    payTo.classList.toggle('hidden', !payerWallet);
+    // Имя плательщика уже есть в плашке с номером — отдельный бейдж с именем не нужен
+    document.querySelector('.payer-name-badge').classList.toggle('hidden', !!payerWallet);
     if (payerWallet) {
-        walletBox.style.display = 'flex';
-        document.getElementById('payerWalletDisplay').innerText = payerWallet;
-    } else {
-        walletBox.style.display = 'none';
+        document.getElementById('payToName').innerText = payer;
+        document.getElementById('payToNumber').innerText = formatWallet(payerWallet);
     }
 
     const payerDue = totalsByParticipant[payer] || 0;
@@ -662,12 +734,9 @@ function deleteItem(type, id, pName = '') {
     if (type === 'shared') {
         sharedDishes.splice(id, 1);
     } else {
+        // Участник остаётся, даже если своих блюд не осталось: он может есть общее.
+        // Убрать его совсем — кнопкой удаления участника
         participants[pName].splice(id, 1);
-        if (participants[pName].length === 0) {
-            delete participants[pName];
-            removeFromShared(pName);
-            if (payer === pName) payer = null;
-        }
     }
     updateUI();
 }
@@ -778,6 +847,11 @@ function renderCheckCanvas() {
         backgroundColor: getComputedStyle(document.body).backgroundColor,
         scale: 2, // Better quality
         onclone: (clonedDoc) => {
+            // В копии страницы анимации появления запускаются заново, и картинка
+            // захватывает элементы полупрозрачными — отключаем анимации
+            const st = clonedDoc.createElement('style');
+            st.textContent = '*, *::before, *::after { animation: none !important; transition: none !important; }';
+            clonedDoc.head.appendChild(st);
             // Hide controls ONLY in the screenshot, not in the real DOM
             const exitControls = clonedDoc.querySelector('.screenshot-exit');
             if (exitControls) {
@@ -869,6 +943,20 @@ function downloadImage(e) {
         setBusy(btn, false);
         pushToast('error', 'Ошибка при создании картинки');
     });
+}
+
+// Номер с разбивкой на группы, чтобы его было легко прочитать и переписать:
+// карта 4444 1234 5678 9012, телефон 985 19 05 90, +992 985 19 05 90
+function formatWallet(v) {
+    const raw = String(v || '').trim();
+    const digits = raw.replace(/[\s\-()]/g, '');
+    if (!/^\+?\d{6,}$/.test(digits)) return raw; // не только цифры — показываем как есть
+    const plus = digits.startsWith('+') ? '+' : '';
+    let d = digits.replace('+', '');
+    const phone = n => n.replace(/^(\d{3})(\d{2})(\d{2})(\d{2})$/, '$1 $2 $3 $4');
+    if (d.length === 9) return plus + phone(d);
+    if (d.length === 12 && d.startsWith('992')) return '+992 ' + phone(d.slice(3));
+    return plus + d.replace(/(\d{4})(?=\d)/g, '$1 ');
 }
 
 function copyWallet() {
