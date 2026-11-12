@@ -1630,3 +1630,30 @@ body.screenshot-mode .screenshot-exit {
         grid-template-columns: 1fr 74px 52px 32px;
     }
 }
+
+.rc-ai-setup .input-with-btn .btn {
+    width: auto;
+    flex-shrink: 0;
+    padding: 0 12px;
+}
+
+.rc-ai-result {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+}
+
+.rc-ai-result.ok { border-color: var(--primary); color: var(--primary); }
+.rc-ai-result.bad { border-color: var(--danger); }
+.rc-ai-result.bad b { color: var(--danger); }
+
+.rc-ai-detail {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-family: monospace;
+    font-size: 0.75rem;
+}

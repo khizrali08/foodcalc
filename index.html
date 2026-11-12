@@ -13,7 +13,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -293,8 +293,10 @@
                 <p class="rc-muted">Ключ хранится только на этом устройстве. Фото чека отправляется в Google.</p>
                 <div class="input-with-btn">
                     <input id="rcGeminiKeyInput" type="password" placeholder="AIza…" autocomplete="off" class="ym-disable-keys">
+                    <button class="btn btn-secondary" onclick="rcTestGemini()">Проверить</button>
                     <button class="btn btn-primary" onclick="rcSaveGeminiKey()">Сохранить</button>
                 </div>
+                <div id="rcAiResult"></div>
             </div>
             <div class="rc-progress hidden" id="receiptProgress"><div class="rc-bar"></div><span></span></div>
             <div id="receiptBody"></div>
@@ -359,7 +361,7 @@
 
     <script src="app.js?v=4"></script>
     <script src="receipt-parse.js?v=1"></script>
-    <script src="receipt.js?v=1"></script>
+    <script src="receipt.js?v=2"></script>
 </body>
 
 </html>

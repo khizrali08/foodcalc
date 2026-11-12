@@ -473,6 +473,8 @@ async function receiptFromPhoto(input) {
                 source = 'Gemini';
             } catch (e) {
                 console.error(e);
+                rcRememberGeminiError(e);
+                rcRenderAiStatus();
                 pushToast('error', (e.userMessage || 'Gemini не ответил') + ' — распознаю без ИИ');
             }
         }
@@ -558,17 +560,21 @@ function rcRenderAiStatus() {
     const el = document.getElementById('receiptAi');
     if (!el) return;
     const key = rcGeminiKey();
+    const err = rcLastGeminiError();
     el.innerHTML = key
         ? `<span class="rc-ai-on"><i class="fas fa-magic"></i> Распознавание: Gemini</span>
-           <button class="rc-link" onclick="rcAiSettings()">настроить</button>`
+           ${err ? `<span class="rc-bad"><i class="fas fa-exclamation-triangle"></i> была ошибка</span>` : ''}
+           <button class="rc-link" onclick="rcAiSettings()">${err ? 'подробнее' : 'настроить'}</button>`
         : `<span class="rc-muted"><i class="fas fa-magic"></i> Для точного распознавания подключите бесплатный Gemini</span>
            <button class="rc-link" onclick="rcAiSettings()">подключить</button>`;
+    rcRenderAiError();
 }
 
 function rcAiSettings() {
     const box = document.getElementById('receiptAiSetup');
     box.classList.toggle('hidden');
     document.getElementById('rcGeminiKeyInput').value = rcGeminiKey();
+    rcRenderAiError();
 }
 
 function rcSaveGeminiKey() {
@@ -577,42 +583,170 @@ function rcSaveGeminiKey() {
         if (v) localStorage.setItem(RC_GEMINI_KEY, v);
         else localStorage.removeItem(RC_GEMINI_KEY);
         localStorage.removeItem(RC_GEMINI_MODEL);
+        localStorage.removeItem(RC_GEMINI_ERR);
     } catch (e) { /* без хранилища ключ не сохранится */ }
     document.getElementById('receiptAiSetup').classList.add('hidden');
     rcRenderAiStatus();
     pushToast('success', v ? 'Ключ Gemini сохранён на этом устройстве' : 'Ключ Gemini удалён');
 }
 
-function rcGeminiError(status, text) {
-    const e = new Error('Gemini ' + status + ': ' + text);
-    e.userMessage = status === 400 || status === 403 ? 'Ключ Gemini не подходит'
-        : status === 429 ? 'Лимит бесплатных запросов Gemini исчерпан'
-            : 'Gemini не ответил';
+// --- Ошибки Gemini: понятное объяснение + точный ответ Google ---
+const RC_GEMINI_ERR = 'gs_geminiLastError';
+
+function rcExplainGemini(status, msg) {
+    const m = String(msg || '').toLowerCase();
+    if (status === 0) return 'Нет связи с сервером Google. Возможно, он недоступен из вашей сети — попробуйте другой интернет (Wi-Fi/мобильный) или VPN';
+    if (/api_key_invalid|api key not valid|api key expired|invalid api key/.test(m)) return 'Ключ неверный или устарел — скопируйте его заново из AI Studio';
+    if (/location is not supported|user location/.test(m)) return 'Google не разрешает Gemini API из вашей страны или сети. Работает через VPN';
+    if (/service_disabled|has not been used|is disabled|not been enabled/.test(m)) return 'Для этого ключа не включён Gemini API — создайте ключ в AI Studio заново';
+    if (/referer|referrer|api_key_service_blocked|api_key_http_referrer_blocked/.test(m)) return 'У ключа есть ограничения по сайтам или API — снимите их в настройках ключа';
+    if (status === 429 || /quota|resource_exhausted|rate limit/.test(m)) return 'Лимит бесплатных запросов Gemini исчерпан — попробуйте позже';
+    if (/safety|blocked|prohibited/.test(m)) return 'Gemini отказался обрабатывать это фото';
+    if (status === 404) return 'Модель Gemini не найдена';
+    if (status >= 500 || /overloaded|unavailable/.test(m)) return 'Gemini перегружен или временно недоступен — попробуйте через минуту';
+    if (status === 403) return 'Нет доступа к Gemini с этим ключом';
+    if (status === 400) return 'Gemini отклонил запрос';
+    return 'Gemini не ответил';
+}
+
+function rcGeminiError(stage, status, body) {
+    let detail = String(body || '');
+    try {
+        const j = JSON.parse(detail);
+        if (j && j.error) {
+            const reasons = (j.error.details || []).map(d => d.reason).filter(Boolean);
+            detail = [j.error.status, reasons.join(','), j.error.message].filter(Boolean).join(' · ');
+        }
+    } catch (e) { /* ответ не JSON — показываем как есть */ }
+    detail = detail.slice(0, 400);
+    const e = new Error(`Gemini ${stage} ${status}: ${detail}`);
+    e.status = status;
+    e.stage = stage;
+    e.detail = detail;
+    e.userMessage = rcExplainGemini(status, detail);
     return e;
 }
 
-// Выбрать доступную модель Flash (названия моделей со временем меняются)
-async function rcGeminiModel(key) {
+function rcRememberGeminiError(e) {
     try {
-        const saved = localStorage.getItem(RC_GEMINI_MODEL);
-        if (saved) return saved;
-    } catch (e) { /* нет хранилища */ }
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {
+        localStorage.setItem(RC_GEMINI_ERR, JSON.stringify({
+            at: new Date().toLocaleString('ru-RU'), stage: e.stage || '', status: e.status ?? '',
+            msg: e.userMessage || 'Gemini не ответил', detail: e.detail || String(e.message || e)
+        }));
+    } catch (x) { /* ок */ }
+}
+
+function rcLastGeminiError() {
+    try { return JSON.parse(localStorage.getItem(RC_GEMINI_ERR) || 'null'); } catch (e) { return null; }
+}
+
+function rcRenderAiError() {
+    const el = document.getElementById('rcAiResult');
+    if (!el || el.dataset.test === '1') return;
+    const err = rcLastGeminiError();
+    el.innerHTML = err ? rcAiErrorHtml('Последняя ошибка (' + err.at + ')', err) : '';
+}
+
+function rcAiErrorHtml(title, err) {
+    return `<div class="rc-ai-result bad">
+        <b><i class="fas fa-exclamation-triangle"></i> ${esc(title)}</b>
+        <div>${esc(err.msg)}</div>
+        <div class="rc-ai-detail">Ответ Google${err.stage ? ' (' + esc(err.stage) + ')' : ''}: ${esc(String(err.status))} ${esc(err.detail || '')}</div>
+    </div>`;
+}
+
+async function rcFetchGemini(stage, url, opts) {
+    let res;
+    try {
+        res = await fetch(url, opts);
+    } catch (e) {
+        throw rcGeminiError(stage, 0, String(e && e.message || e));
+    }
+    if (!res.ok) throw rcGeminiError(stage, res.status, await res.text());
+    return res.json();
+}
+
+// Выбрать модель: самая новая Flash; если таких нет — любая подходящая Gemini
+async function rcGeminiModel(key, fresh) {
+    if (!fresh) {
+        try {
+            const saved = localStorage.getItem(RC_GEMINI_MODEL);
+            if (saved) return saved;
+        } catch (e) { /* нет хранилища */ }
+    }
+    const data = await rcFetchGemini('список моделей', 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', {
         headers: { 'x-goog-api-key': key }
     });
-    if (!res.ok) throw rcGeminiError(res.status, await res.text());
-    const data = await res.json();
-    const names = (data.models || [])
+    const all = (data.models || [])
         .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
         .map(m => m.name.replace(/^models\//, ''))
-        .filter(n => /^gemini-[\d.]+-flash(-latest)?$/.test(n) || n === 'gemini-flash-latest');
-    if (!names.length) throw rcGeminiError(404, 'нет подходящей модели');
-    // Самая новая версия Flash
-    const ver = n => parseFloat((n.match(/gemini-([\d.]+)/) || [0, 0])[1]);
-    names.sort((a, b) => ver(b) - ver(a) || (a.includes('latest') ? 1 : -1));
-    const model = names.includes('gemini-flash-latest') ? 'gemini-flash-latest' : names[0];
+        .filter(n => /^gemini-/.test(n) && !/(embed|tts|image|live|audio|aqa|vision|robotics|computer|thinking-exp)/.test(n));
+    const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [0, 0])[1]);
+    const rank = n => (/flash/.test(n) ? 0 : 2) + (/lite|8b/.test(n) ? 1 : 0) + (/preview|exp/.test(n) ? 0.5 : 0);
+    if (!all.length) throw rcGeminiError('список моделей', 404, 'нет моделей Gemini для generateContent');
+    let model;
+    if (all.includes('gemini-flash-latest')) model = 'gemini-flash-latest';
+    else model = all.slice().sort((a, b) => rank(a) - rank(b) || ver(b) - ver(a) || a.length - b.length)[0];
     try { localStorage.setItem(RC_GEMINI_MODEL, model); } catch (e) { /* ок */ }
     return model;
+}
+
+// Запрос к модели с повтором: другая модель при 404, пауза при перегрузке,
+// без схемы ответа, если модель её не принимает
+async function rcGeminiGenerate(key, parts, useSchema) {
+    let model = await rcGeminiModel(key);
+    let schema = useSchema;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const generationConfig = { temperature: 0, responseMimeType: 'application/json' };
+        if (schema) generationConfig.responseSchema = RC_GEMINI_SCHEMA;
+        try {
+            return await rcFetchGemini('распознавание, ' + model,
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+                body: JSON.stringify({ contents: [{ parts }], generationConfig })
+            });
+        } catch (e) {
+            if (attempt === 2) throw e;
+            if (e.status === 404) { model = await rcGeminiModel(key, true); continue; }
+            if (e.status === 400 && schema && /schema|response_?mime|json mode/i.test(e.detail)) { schema = false; continue; }
+            if (e.status >= 500) { await new Promise(r => setTimeout(r, 1500)); continue; }
+            throw e;
+        }
+    }
+}
+
+// Кнопка «Проверить ключ»: список моделей + крошечный запрос
+async function rcTestGemini() {
+    const el = document.getElementById('rcAiResult');
+    const key = (document.getElementById('rcGeminiKeyInput').value || '').trim() || rcGeminiKey();
+    if (!key) { pushToast('error', 'Вставьте ключ'); return; }
+    el.dataset.test = '1';
+    el.innerHTML = '<div class="rc-ai-result">Проверяю…</div>';
+    try {
+        try { localStorage.removeItem(RC_GEMINI_MODEL); } catch (e) { /* ок */ }
+        const data = await rcGeminiGenerate(key, [{ text: 'Ответь JSON: {"items": []}' }], false);
+        const model = localStorage.getItem(RC_GEMINI_MODEL) || '';
+        const ok = !!((data.candidates || [])[0]);
+        if (!ok) throw rcGeminiError('проверка', 200, JSON.stringify(data.promptFeedback || data).slice(0, 300));
+        try { localStorage.removeItem(RC_GEMINI_ERR); } catch (e) { /* ок */ }
+        el.innerHTML = `<div class="rc-ai-result ok"><b><i class="fas fa-check-circle"></i> Ключ работает</b><div>Модель: ${esc(model)}</div></div>`;
+    } catch (e) {
+        console.error(e);
+        rcRememberGeminiError(e);
+        el.innerHTML = rcAiErrorHtml('Ключ не работает', { msg: e.userMessage || String(e.message), stage: e.stage, status: e.status ?? '', detail: e.detail || String(e.message) });
+    } finally {
+        delete el.dataset.test;
+        rcRenderAiStatusOnly();
+    }
+}
+
+function rcRenderAiStatusOnly() {
+    const r = document.getElementById('rcAiResult');
+    const saved = r ? r.innerHTML : '';
+    if (r) r.dataset.test = '1';
+    rcRenderAiStatus();
+    if (r) { r.innerHTML = saved; delete r.dataset.test; }
 }
 
 const RC_GEMINI_PROMPT = `Это фото ресторанного чека (Таджикистан, валюта сомони). Извлеки позиции.
@@ -656,7 +790,6 @@ const RC_GEMINI_SCHEMA = {
 
 async function rcGemini(canvas) {
     const key = rcGeminiKey();
-    const model = await rcGeminiModel(key);
     // Цветное фото, но не слишком большое: ~1600 px по длинной стороне
     const k = Math.min(1, 1600 / Math.max(canvas.width, canvas.height));
     const c = document.createElement('canvas');
@@ -665,23 +798,20 @@ async function rcGemini(canvas) {
     c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
     const b64 = c.toDataURL('image/jpeg', 0.85).split(',')[1];
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: RC_GEMINI_PROMPT }, { inline_data: { mime_type: 'image/jpeg', data: b64 } }] }],
-            generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: RC_GEMINI_SCHEMA }
-        })
-    });
-    if (!res.ok) {
-        // Модель могли убрать — в следующий раз выбрать заново
-        if (res.status === 404) { try { localStorage.removeItem(RC_GEMINI_MODEL); } catch (e) { /* ок */ } }
-        throw rcGeminiError(res.status, await res.text());
-    }
-    const data = await res.json();
-    const text = (((data.candidates || [])[0] || {}).content || {}).parts?.map(p => p.text || '').join('') || '';
+    const data = await rcGeminiGenerate(key, [
+        { text: RC_GEMINI_PROMPT },
+        { inline_data: { mime_type: 'image/jpeg', data: b64 } }
+    ], true);
+    const cand = (data.candidates || [])[0];
+    if (!cand) throw rcGeminiError('распознавание', 200, 'пустой ответ: ' + JSON.stringify(data.promptFeedback || data).slice(0, 300));
+    const text = ((cand.content || {}).parts || []).filter(p => !p.thought).map(p => p.text || '').join('');
     let j;
-    try { j = JSON.parse(text); } catch (e) { throw rcGeminiError(500, 'неверный ответ: ' + text.slice(0, 200)); }
+    try {
+        j = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ''));
+    } catch (e) {
+        throw rcGeminiError('распознавание', 200, 'не JSON (' + (cand.finishReason || '') + '): ' + text.slice(0, 200));
+    }
+    try { localStorage.removeItem(RC_GEMINI_ERR); } catch (e) { /* ок */ }
     return rcFromGemini(j);
 }
 
