@@ -1657,3 +1657,17 @@ body.screenshot-mode .screenshot-exit {
     font-family: monospace;
     font-size: 0.75rem;
 }
+
+.rc-label-link {
+    margin-left: 8px;
+    font-size: 0.75rem;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+}
+
+.rc-chip.rc-group {
+    border-style: solid;
+    color: var(--secondary);
+    border-color: var(--secondary);
+}

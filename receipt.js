@@ -59,7 +59,7 @@ function rcItem(o) {
 // ---------- Открытие ----------
 function openReceipt() {
     rc = rcLoad();
-    if (rc.people.length === 0) rc.people = Object.keys(participants);
+    // Людей не подставляем: чек может быть с другой компанией. Подсказки — кнопками ниже.
     if (!rc.date) rc.date = checkDate || todayLocal();
     if (!rc.place) rc.place = restaurantName || '';
     rcSave();
@@ -68,10 +68,8 @@ function openReceipt() {
 }
 
 function receiptReset() {
-    if (rc.items.length && !confirm('Очистить список позиций чека?')) return;
-    const people = rc.people;
+    if ((rc.items.length || rc.people.length) && !confirm('Очистить чек: позиции и список людей?')) return;
     rc = rcNew();
-    rc.people = people;
     rc.date = todayLocal();
     rcOpenId = null;
     rcSave();
@@ -79,10 +77,47 @@ function receiptReset() {
 }
 
 // ---------- Люди ----------
+// Имена из текущего расчёта и истории, свежие первыми
 function rcKnownNames() {
     const names = new Set(Object.keys(participants));
     getHistory().forEach(h => Object.keys((h.data && h.data.participants) || {}).forEach(n => names.add(n)));
     return [...names].filter(n => !rc.people.includes(n));
+}
+
+// Компании из текущего расчёта и прошлых чеков — добавить всех одним нажатием
+let rcGroupList = [];
+function rcGroups() {
+    const seen = new Set();
+    const out = [];
+    const add = (label, names) => {
+        names = names.filter(Boolean);
+        if (names.length < 2) return;
+        const key = names.slice().sort().join('|');
+        if (seen.has(key)) return;
+        seen.add(key);
+        if (names.every(n => rc.people.includes(n))) return; // все уже добавлены
+        out.push({ label, names });
+    };
+    add(restaurantName ? restaurantName : 'Текущий расчёт', Object.keys(participants));
+    getHistory().forEach(h => add(h.title && h.title !== 'Без названия' ? h.title : (h.date || 'Прошлый чек'),
+        Object.keys((h.data && h.data.participants) || {})));
+    return out.slice(0, 4);
+}
+
+function rcAddGroup(i) {
+    const g = rcGroupList[i];
+    if (!g) return;
+    g.names.forEach(n => { if (!rc.people.includes(n)) rc.people.push(n); });
+    rcSave();
+    renderReceipt();
+}
+
+function rcClearPeople() {
+    if (!confirm('Убрать всех из списка «Кто был»?')) return;
+    rc.people = [];
+    rc.items.forEach(it => { it.own = {}; it.group = []; });
+    rcSave();
+    renderReceipt();
 }
 
 function rcAddPerson(name) {
@@ -205,7 +240,11 @@ function renderReceipt() {
     const body = document.getElementById('receiptBody');
     if (!body) return;
 
-    const known = rcKnownNames().slice(0, 14);
+    const known = rcKnownNames().slice(0, 12);
+    rcGroupList = rcGroups();
+    const groupsHtml = rcGroupList.map((g, i) =>
+        `<button class="rc-chip rc-suggest rc-group" onclick="rcAddGroup(${i})" title="${esc(g.names.join(', '))}">👥 ${esc(g.label)} · ${g.names.length}</button>`
+    ).join('');
     const peopleHtml = rc.people.map(n =>
         `<span class="rc-chip on">${esc(n)}<button class="rc-x" onclick="rcRemovePerson(${jsArg(n)})" title="Убрать">×</button></span>`
     ).join('');
@@ -219,12 +258,14 @@ function renderReceipt() {
 
     body.innerHTML = `
         <div class="rc-section">
-            <div class="rc-label">Кто был <span class="rc-muted">(${rc.people.length})</span></div>
+            <div class="rc-label">Кто был <span class="rc-muted">(${rc.people.length})</span>
+                ${rc.people.length ? `<button class="rc-link rc-label-link" onclick="rcClearPeople()">убрать всех</button>` : ''}</div>
             <div class="rc-chips">${peopleHtml}
                 <input id="rcPersonInput" class="rc-person-input" placeholder="+ имя, Enter" list="rcPeopleList"
                     onkeydown="rcPersonKey(event)" onchange="rcAddPerson(this.value)">
                 <datalist id="rcPeopleList">${rcKnownNames().map(n => `<option value="${esc(n)}">`).join('')}</datalist>
             </div>
+            ${groupsHtml ? `<div class="rc-chips rc-suggest-row">${groupsHtml}</div>` : ''}
             ${suggestHtml ? `<div class="rc-chips rc-suggest-row">${suggestHtml}</div>` : ''}
         </div>
         <div class="rc-section">
