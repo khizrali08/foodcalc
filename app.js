@@ -268,14 +268,36 @@ function addDish() {
 function openSharedModal() {
     const container = document.getElementById('sharedParticipantsCheckboxes');
     const pNames = Object.keys(participants);
-    if (pNames.length === 0) {
-        container.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted);">Сначала добавьте участников</p>';
-    } else {
-        container.innerHTML = pNames.map(n =>
-            '<label><input type="checkbox" value="' + esc(n) + '" checked> ' + esc(n) + '</label>'
-        ).join('');
-    }
+    container.innerHTML = pNames.map(n =>
+        '<label><input type="checkbox" value="' + esc(n) + '" checked> ' + esc(n) + '</label>'
+    ).join('');
+    document.getElementById('sharedNewPerson').value = '';
     openModal('sharedModal');
+}
+
+// Человек, который не заказывал себе, а ел только общее: добавляется прямо здесь.
+// В расчёт он попадёт при «Добавить общее блюдо»
+function sharedAddPerson() {
+    const input = document.getElementById('sharedNewPerson');
+    const name = input.value.trim();
+    if (!name) return;
+    const container = document.getElementById('sharedParticipantsCheckboxes');
+    const existing = [...container.querySelectorAll('input[type="checkbox"]')].find(cb => cb.value === name);
+    if (existing) {
+        existing.checked = true;
+    } else {
+        container.insertAdjacentHTML('beforeend',
+            '<label><input type="checkbox" value="' + esc(name) + '" checked> ' + esc(name) + '</label>');
+    }
+    input.value = '';
+    input.focus();
+}
+
+function sharedNewPersonKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        sharedAddPerson();
+    }
 }
 
 function addSharedDish() {
@@ -288,12 +310,19 @@ function addSharedDish() {
         return;
     }
 
-    const checked = document.querySelectorAll('#sharedParticipantsCheckboxes input[type="checkbox"]:checked');
+    let checked = document.querySelectorAll('#sharedParticipantsCheckboxes input[type="checkbox"]:checked');
+    // Имя, вписанное в поле, но без Enter, — тоже добавить
+    if (document.getElementById('sharedNewPerson').value.trim()) {
+        sharedAddPerson();
+        checked = document.querySelectorAll('#sharedParticipantsCheckboxes input[type="checkbox"]:checked');
+    }
     const selectedParticipants = Array.from(checked).map(cb => cb.value);
     if (Object.keys(participants).length > 0 && selectedParticipants.length === 0) {
         pushToast('error', 'Отметьте хотя бы одного участника');
         return;
     }
+    // Новые люди (только общее) — в участники, без своих блюд
+    selectedParticipants.forEach(n => { if (!participants[n]) participants[n] = []; });
     sharedDishes.push({ sharedDishName: dish, sharedDishCost: cost, sharedDishQuantity: qty, participants: selectedParticipants });
     dishPrices[dish] = cost;
 
@@ -482,6 +511,7 @@ function renderParticipantsList() {
                     <button class="icon-btn delete" onclick="deleteParticipant(${jsArg(name)})"><i class="fas fa-user-minus"></i></button>
                 </div>
                 <div class="dish-list">
+                    ${dishes.length === 0 ? '<div class="dish-item" style="color: var(--text-muted); font-style: italic;">Только общие блюда</div>' : ''}
                     ${dishes.map((d, idx) => `
                         <div class="dish-item">
                             <span>${d.dishQuantity}х ${esc(d.dishName)} — ${(d.dishCost * d.dishQuantity).toFixed(2)} SM</span>
@@ -530,7 +560,7 @@ function summaryRows(name, personalSubtotal) {
     }
 
     const row = (label, value, sub) => `<div class="summary-row"${sub ? ' style="padding-left:10px;font-size:0.8rem;opacity:0.75;"' : ''}><span>${label}</span><span>${value}</span></div>`;
-    let html = row('Свои блюда:', money(personalCents));
+    let html = personalCents || !shares.length ? row('Свои блюда:', money(personalCents)) : '';
     if (shares.length) {
         html += row('Общие блюда:', money(sharedCents));
         html += shares.map(x => row('└ ' + esc(x.label), money(x.cents), true)).join('');
@@ -704,12 +734,9 @@ function deleteItem(type, id, pName = '') {
     if (type === 'shared') {
         sharedDishes.splice(id, 1);
     } else {
+        // Участник остаётся, даже если своих блюд не осталось: он может есть общее.
+        // Убрать его совсем — кнопкой удаления участника
         participants[pName].splice(id, 1);
-        if (participants[pName].length === 0) {
-            delete participants[pName];
-            removeFromShared(pName);
-            if (payer === pName) payer = null;
-        }
     }
     updateUI();
 }

@@ -250,9 +250,9 @@
                 </div>
                 <div class="field">
                     <label>Кто участвует?</label>
-                    <div id="sharedParticipantsCheckboxes" class="participants-checkboxes">
-                        <p style="font-size: 0.85rem; color: var(--text-muted);">Сначала добавьте участников</p>
-                    </div>
+                    <div id="sharedParticipantsCheckboxes" class="participants-checkboxes"></div>
+                    <input id="sharedNewPerson" list="participantsDatalist" style="margin-top: 6px;"
+                        placeholder="+ кто ел только общее (имя, Enter)" onkeydown="sharedNewPersonKey(event)">
                 </div>
                 <button class="btn btn-primary" onclick="addSharedDish()">
                     <i class="fas fa-plus-circle"></i> Добавить общее блюдо
@@ -359,7 +359,7 @@
         </button>
     </div>
 
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=11"></script>
     <script src="receipt-parse.js?v=1"></script>
     <script src="receipt.js?v=5"></script>
 </body>
