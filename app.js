@@ -7,6 +7,7 @@ let payer = null;
 let payerWallet = '';
 
 let totalsByParticipant = {};
+let totalsExact = {}; // доли до округления до дирамов
 let totalBill = 0;
 let restaurantName = '';
 let checkDate = ''; // YYYY-MM-DD
@@ -311,6 +312,7 @@ function calculateTotals() {
     const participantCount = pNames.length;
     totalBill = 0;
     totalsByParticipant = {};
+    totalsExact = {};
 
     pNames.forEach(name => {
         const personal = participants[name].reduce((acc, d) => acc + (d.dishCost * d.dishQuantity), 0);
@@ -325,6 +327,7 @@ function calculateTotals() {
         const sharedCommission = sharedForPerson * (commission / 100);
         const final = personal + personalCommission + sharedForPerson + sharedCommission;
         totalsByParticipant[name] = final;
+        totalsExact[name] = final;
         totalBill += final;
     });
 
@@ -490,19 +493,51 @@ function renderParticipantsList() {
                     `).join('')}
                 </div>
                 <div class="summary-badge">
-                    <div class="summary-row"><span>Промежуточный итог:</span><span>${personalSubtotal.toFixed(2)} SM</span></div>
-                    <div class="summary-row"><span>Доля общих + комиссия:</span><span>${(totalsByParticipant[name] - personalSubtotal * (1 + commission / 100)).toFixed(2)} SM</span></div>
-                    ${sharedDishes.map(d => {
-                        const dp = sharedParticipantsOf(d, Object.keys(participants));
-                        if (!dp.includes(name)) return '';
-                        const share = (d.sharedDishCost * d.sharedDishQuantity) / dp.length * (1 + commission / 100);
-                        return '<div class="summary-row" style="padding-left:10px;font-size:0.8rem;opacity:0.75;"><span>└ ' + esc(d.sharedDishName) + ' (1/' + dp.length + ')</span><span>' + share.toFixed(2) + ' SM</span></div>';
-                    }).join('')}
+                    ${summaryRows(name, personalSubtotal)}
                     <div class="summary-total"><span>Итого к оплате:</span><span>${totalsByParticipant[name].toFixed(2)} SM</span></div>
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// Строки карточки участника, которые в сумме дают ровно «Итого к оплате»:
+// свои блюда + общие блюда (доли) + сервис + округление (если есть)
+function summaryRows(name, personalSubtotal) {
+    const c = v => Math.round(v * 100);
+    const money = cents => (cents / 100).toFixed(2) + ' SM';
+    const pNames = Object.keys(participants);
+
+    const shares = [];
+    sharedDishes.forEach(d => {
+        const dp = sharedParticipantsOf(d, pNames);
+        if (!dp.includes(name)) return;
+        const exact = (d.sharedDishCost * d.sharedDishQuantity) / dp.length;
+        shares.push({ label: d.sharedDishName + ' (1/' + dp.length + ')', exact, cents: c(exact) });
+    });
+    const personalCents = c(personalSubtotal);
+    let sharedCents = shares.reduce((a, x) => a + x.cents, 0);
+    const totalCents = c(totalsByParticipant[name]);
+    // «Округление» показываем только у плательщика — это лишние дирамы, которые ему достались.
+    // Расхождение в 1 дирам от округления отдельных строк остаётся в строке сервиса.
+    const exactCents = Math.floor((totalsExact[name] ?? totalsByParticipant[name]) * 100 + 1e-6);
+    const roundCents = name === payer ? Math.max(0, totalCents - exactCents) : 0;
+    let serviceCents = totalCents - roundCents - personalCents - sharedCents;
+    if (!commission && serviceCents !== 0) { // без сервиса расхождение (≤1 дирам) — в общие блюда
+        sharedCents += serviceCents;
+        if (shares.length) shares[shares.length - 1].cents += serviceCents;
+        serviceCents = 0;
+    }
+
+    const row = (label, value, sub) => `<div class="summary-row"${sub ? ' style="padding-left:10px;font-size:0.8rem;opacity:0.75;"' : ''}><span>${label}</span><span>${value}</span></div>`;
+    let html = row('Свои блюда:', money(personalCents));
+    if (shares.length) {
+        html += row('Общие блюда:', money(sharedCents));
+        html += shares.map(x => row('└ ' + esc(x.label), money(x.cents), true)).join('');
+    }
+    if (commission) html += row(`Сервис ${commission}%:`, money(serviceCents));
+    if (roundCents > 0) html += row('Округление (остаток дирамов):', '+' + money(roundCents));
+    return html;
 }
 
 function updateDatalists() {
