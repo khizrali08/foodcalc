@@ -1674,18 +1674,18 @@ body.screenshot-mode .screenshot-exit {
 
 /* ===== Куда переводить ===== */
 .pay-to {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin: 4px 0 10px;
-    padding: 10px 16px;
-    border: 2px solid var(--primary);
-    border-radius: 14px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 16px;
+    border: 1px solid var(--primary);
+    border-radius: 10px;
     background: var(--primary-light);
+    white-space: nowrap;
 }
 
 .pay-to-label {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text-main);
 }
 
@@ -1695,25 +1695,64 @@ body.screenshot-mode .screenshot-exit {
 }
 
 .pay-to-number {
-    font-size: 1.75rem;
+    font-size: 1.4rem;
     font-weight: 800;
-    letter-spacing: 0.04em;
-    line-height: 1.15;
+    letter-spacing: 0.03em;
     color: var(--primary);
     font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere;
 }
 
-body.screenshot-mode .pay-to-number {
-    font-size: 2rem;
+/* В режиме скриншота — той же высоты, что «Место» и «Общий счёт» */
+body.screenshot-mode .pay-to {
+    height: 42px;
+    box-sizing: border-box;
+    align-items: center;
+    padding: 0 16px;
 }
 
-@media (max-width: 480px) {
-    .pay-to-number {
-        font-size: 1.5rem;
+/* Имя уже в плашке с номером — отдельный бейдж с именем скрыт и на скриншоте */
+body.screenshot-mode .payer-name-badge.hidden {
+    display: none !important;
+}
+
+/* Телефон: шапка в столбик — плашка во всю ширину, номер крупнее */
+@media (max-width: 600px) {
+    .payer-info-header {
+        flex-wrap: wrap;
+        gap: 8px;
     }
 
-    body.screenshot-mode .pay-to-number {
+    .payer-info-header > div:first-child:has(.pay-to:not(.hidden)) {
+        flex: 1 1 100%;
+    }
+
+    /* Под номером: дата, место и общий счёт — ровной строкой слева */
+    .payer-info-header:has(.pay-to:not(.hidden)) .right-info-group {
+        flex: 1 1 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .pay-to-number {
+        white-space: nowrap;
+    }
+
+    .pay-to,
+    body.screenshot-mode .pay-to {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0;
+        width: 100%;
+        height: auto;
+        padding: 8px 14px;
+        white-space: normal;
+    }
+
+    .pay-to-number {
         font-size: 1.7rem;
     }
 }

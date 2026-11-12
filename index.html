@@ -13,7 +13,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=7">
 
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -139,6 +139,12 @@
                             id="payerNameDisplay">—</span>
                     </div>
 
+                    <!-- Куда переводить: имя и крупный номер, чтобы читалось даже на маленьком скриншоте -->
+                    <div id="payToBox" class="pay-to hidden">
+                        <span class="pay-to-label"><i class="fas fa-wallet"></i> Переводить <b id="payToName"></b>:</span>
+                        <span class="pay-to-number ym-hide-content" id="payToNumber"></span>
+                    </div>
+
                     <div id="payerReimbursementBadge" class="reimbursement-badge"
                         style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 4px 10px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.2);">
                         К возврату: <span id="payerReimbursement">0.00</span>
@@ -163,11 +169,6 @@
                         <div class="value" id="screenshotTotalAmount">0.00 SM</div>
                     </div>
                 </div>
-            </div>
-            <!-- Куда переводить: крупно, чтобы номер читался даже на маленьком скриншоте -->
-            <div id="payToBox" class="pay-to hidden">
-                <div class="pay-to-label"><i class="fas fa-wallet"></i> Переводить <b id="payToName"></b> на номер:</div>
-                <div class="pay-to-number ym-hide-content" id="payToNumber"></div>
             </div>
             <div id="debtsContainer" style="margin-top: 2px;"></div>
         </div>
@@ -358,7 +359,7 @@
         </button>
     </div>
 
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
     <script src="receipt-parse.js?v=1"></script>
     <script src="receipt.js?v=5"></script>
 </body>

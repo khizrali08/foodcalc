@@ -594,6 +594,8 @@ function updatePayerUI() {
     // Куда переводить — крупная плашка с номером
     const payTo = document.getElementById('payToBox');
     payTo.classList.toggle('hidden', !payerWallet);
+    // Имя плательщика уже есть в плашке с номером — отдельный бейдж с именем не нужен
+    document.querySelector('.payer-name-badge').classList.toggle('hidden', !!payerWallet);
     if (payerWallet) {
         document.getElementById('payToName').innerText = payer;
         document.getElementById('payToNumber').innerText = formatWallet(payerWallet);
