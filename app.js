@@ -337,8 +337,8 @@ function calculateTotals() {
 }
 
 // Округление до дирамов так, чтобы суммы сходились:
-// общий счёт округляется один раз, а недостающие дирамы раздаются
-// участникам с наибольшими отброшенными остатками (метод наибольшего остатка).
+// общий счёт округляется один раз, а недостающие дирамы получает плательщик
+// (если он не выбран — участники с наибольшими отброшенными остатками).
 // Тогда сумма долгов всегда равна «К возврату», а сумма всех — общему счёту.
 function roundTotals() {
     const totalCents = Math.round(totalBill * 100 + 1e-6);
@@ -353,6 +353,13 @@ function roundTotals() {
         return { name, cents: floor, rest: exact - floor };
     });
     let left = totalCents - parts.reduce((acc, p) => acc + p.cents, 0);
+    // Лишние дирамы от округления — плательщику: он и так платит за всех,
+    // а у остальных одинаковые заказы стоят одинаково
+    const payerPart = parts.find(p => p.name === payer);
+    if (payerPart && left > 0) {
+        payerPart.cents += left;
+        left = 0;
+    }
     parts.slice().sort((a, b) => b.rest - a.rest).forEach(p => {
         if (left > 0) { p.cents++; left--; }
     });
